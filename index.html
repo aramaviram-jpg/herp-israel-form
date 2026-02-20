@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>דיווח תצפית זוחלים ודו-חיים</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            direction: rtl;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .required {
+            color: #e74c3c;
+        }
+        
+        .recommended {
+            color: #f39c12;
+            font-weight: normal;
+            font-size: 12px;
+        }
+        
+        input[type="text"],
+        input[type="date"],
+        input[type="time"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        select {
+            cursor: pointer;
+            background: white;
+        }
+        
+        .file-upload {
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .file-upload:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .file-upload input[type="file"] {
+            display: none;
+        }
+        
+        .file-upload-label {
+            cursor: pointer;
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .file-list {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .location-capture {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .btn-location {
+            flex: 1;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        .btn-location:hover {
+            background: #5568d3;
+        }
+        
+        .btn-location:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .location-status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .location-status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .location-status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 20px;
+        }
+        
+        .submit-btn:hover {
+            background: #059669;
+        }
+        
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .success-message {
+            display: none;
+            background: #10b981;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            animation: slideDown 0.5s ease-out;
+        }
+        
+        .success-message.show {
+            display: block;
+        }
+        
+        @keyframes slideDown {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-right: 4px solid #c33;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        #map {
+            height: 300px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🦎 דיווח תצפית זוחלים ודו-חיים</h1>
+        <p class="subtitle">שתפו אותנו בתצפיות שלכם ועזרו לנו לתעד את המגוון הביולוגי בישראל</p>
+        
+        <div id="successMessage" class="success-message">
+            ✅ הדיווח נשלח בהצלחה! תודה רבה על התרומה למחקר
+        </div>
+        
+        <div id="errorMessage" class="error-message" style="display:none;"></div>
+        
+        <form id="reportForm">
+            <!-- Full Name -->
+            <div class="form-group">
+                <label for="fullName">
+                    שם מלא <span class="required">*</span>
+                </label>
+                <input type="text" id="fullName" name="fullName" required 
+                       placeholder="הזינו את שמכם המלא">
+            </div>
+            
+            <!-- Date -->
+            <div class="form-group">
+                <label for="date">
+                    תאריך התצפית <span class="required">*</span>
+                </label>
+                <input type="date" id="date" name="date" required>
+            </div>
+            
+            <!-- Time -->
+            <div class="form-group">
+                <label for="time">
+                    שעת התצפית <span class="recommended">(מומלץ)</span>
+                </label>
+                <input type="time" id="time" name="time">
+            </div>
+            
+            <!-- Species -->
+            <div class="form-group">
+                <label for="species">
+                    מין בעל החיים <span class="required">*</span>
+                </label>
+                <select id="species" name="species" required>
+                    <option value="">טוען רשימת מינים...</option>
+                </select>
+                <p class="help-text">אם אינכם בטוחים במין, השאירו "לא מזוהה" - נזהה לפי התמונות</p>
+            </div>
+            
+            <!-- Number of Individuals -->
+            <div class="form-group">
+                <label for="numberOfIndividuals">
+                    כמות פרטים <span class="required">*</span>
+                </label>
+                <select id="numberOfIndividuals" name="numberOfIndividuals" required>
+                    <option value="">בחרו כמות</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="Many">רבים</option>
+                    <option value="Unknown count">כמות לא ידועה</option>
+                </select>
+            </div>
+            
+            <!-- Location -->
+            <div class="form-group">
+                <label>
+                    מיקום <span class="required">*</span>
+                </label>
+                <p class="help-text">לחצו על "קבל מיקום אוטומטי" או הזינו ידנית</p>
+                <div class="location-capture">
+                    <button type="button" class="btn-location" id="getLocationBtn">
+                        📍 קבל מיקום אוטומטי
+                    </button>
+                    <button type="button" class="btn-location" id="manualLocationBtn">
+                        🗺️ הזן מיקום ידני
+                    </button>
+                </div>
+                <div id="locationStatus" class="location-status" style="display:none;"></div>
+                
+                <input type="hidden" id="latitude" name="latitude" required>
+                <input type="hidden" id="longitude" name="longitude" required>
+                
+                <div id="manualInputs" style="display:none; margin-top:10px;">
+                    <input type="text" id="manualLat" placeholder="קו רוחב (Latitude)" 
+                           style="margin-bottom:10px;">
+                    <input type="text" id="manualLng" placeholder="קו אורך (Longitude)">
+                    <button type="button" class="btn-location" id="saveManualLocation" 
+                            style="margin-top:10px;">
+                        שמור מיקום
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Location Description -->
+            <div class="form-group">
+                <label for="locationDescription">
+                    תיאור המיקום <span class="required">*</span>
+                </label>
+                <textarea id="locationDescription" name="locationDescription" required
+                          placeholder="תארו את המיקום במילים (לדוגמה: 50 מטר צפונית לחניון, ליד עצי זית)"></textarea>
+            </div>
+            
+            <!-- Sighting Details -->
+            <div class="form-group">
+                <label for="sightingDetails">
+                    פרטי התצפית (אופציונלי)
+                </label>
+                <input type="text" id="sightingDetails" name="sightingDetails"
+                       placeholder="לדוגמה: נצפה בפעילות, מתחת לאבן, חוצה כביש">
+            </div>
+            
+            <!-- Photos -->
+            <div class="form-group">
+                <label>
+                    תמונות <span class="recommended">(מומלץ מאוד)</span>
+                </label>
+                <div class="file-upload" id="fileUploadArea">
+                    <input type="file" id="photos" name="photos" multiple accept="image/*">
+                    <label for="photos" class="file-upload-label">
+                        📷 לחצו להעלאת תמונות
+                    </label>
+                    <p class="help-text">ניתן להעלות מספר תמונות</p>
+                </div>
+                <div id="fileList" class="file-list"></div>
+            </div>
+            
+            <!-- Additional Comments -->
+            <div class="form-group">
+                <label for="comments">
+                    הערות נוספות (אופציונלי)
+                </label>
+                <textarea id="comments" name="comments"
+                          placeholder="מידע נוסף: זיווג, מידות, התנהגות, וכו'"></textarea>
+            </div>
+            
+            <!-- Contact Details -->
+            <div class="form-group">
+                <label for="contact">
+                    פרטי יצירת קשר (אופציונלי)
+                </label>
+                <input type="text" id="contact" name="contact"
+                       placeholder="טלפון, אימייל או שם ברשת החברתית">
+            </div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">
+                שלח דיווח
+            </button>
+        </form>
+    </div>
+    
+    <script>
+        // Supabase Configuration
+        const SUPABASE_URL = 'https://qobayftqligpshmyweio.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvYmF5ZnRxbGlncHNobXl3ZWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTEzMDcsImV4cCI6MjA4NzA4NzMwN30.u69AQLyyrXJvgBLTUO9ZpMvpd6dbqTDNj9Z_0RSctps';
+        
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        let selectedFiles = [];
+        
+        // Load species on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadSpecies();
+            setDefaultDate();
+        });
+        
+        // Load species from database
+        async function loadSpecies() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('species')
+                    .select('id, common_name, scientific_name')
+                    .order('common_name');
+                
+                if (error) throw error;
+                
+                const select = document.getElementById('species');
+                select.innerHTML = '';
+                
+                // Add species options
+                data.forEach(species => {
+                    const option = document.createElement('option');
+                    option.value = species.id;
+                    option.textContent = `${species.common_name}${species.scientific_name && species.scientific_name !== 'Unknown' ? ' (' + species.scientific_name + ')' : ''}`;
+                    
+                    // Set "לא מזוהה" as default
+                    if (species.common_name === 'לא מזוהה') {
+                        option.selected = true;
+                    }
+                    
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading species:', error);
+                console.error('Error details:', error.message, error.details, error.hint);
+                showError('שגיאה בטעינת רשימת המינים: ' + (error.message || 'Unknown error'));
+            }
+        }
+        
+        // Set default date to today
+        function setDefaultDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('date').value = today;
+        }
+        
+        // Get automatic location
+        document.getElementById('getLocationBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('getLocationBtn');
+            const statusDiv = document.getElementById('locationStatus');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> מאתר מיקום...';
+            
+            if (!navigator.geolocation) {
+                showLocationStatus('הדפדפן שלך אינו תומך בזיהוי מיקום', false);
+                btn.disabled = false;
+                btn.textContent = '📍 קבל מיקום אוטומטי';
+                return;
+            }
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    document.getElementById('latitude').value = position.coords.latitude;
+                    document.getElementById('longitude').value = position.coords.longitude;
+                    showLocationStatus(`✅ מיקום נקלט: ${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`, true);
+                    btn.disabled = false;
+                    btn.textContent = '📍 קבל מיקום אוטומטי';
+                },
+                (error) => {
+                    showLocationStatus('לא הצלחנו לקבל מיקום. אנא הזינו ידנית או נסו שוב.', false);
+                    btn.disabled = false;
+                    btn.textContent = '📍 קבל מיקום אוטומטי';
+                }
+            );
+        });
+        
+        // Manual location entry
+        document.getElementById('manualLocationBtn').addEventListener('click', () => {
+            const manualInputs = document.getElementById('manualInputs');
+            manualInputs.style.display = manualInputs.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        document.getElementById('saveManualLocation').addEventListener('click', () => {
+            const lat = document.getElementById('manualLat').value;
+            const lng = document.getElementById('manualLng').value;
+            
+            if (!lat || !lng) {
+                showLocationStatus('אנא הזינו גם קו רוחב וגם קו אורך', false);
+                return;
+            }
+            
+            document.getElementById('latitude').value = lat;
+            document.getElementById('longitude').value = lng;
+            showLocationStatus(`✅ מיקום נשמר: ${lat}, ${lng}`, true);
+            document.getElementById('manualInputs').style.display = 'none';
+        });
+        
+        function showLocationStatus(message, success) {
+            const statusDiv = document.getElementById('locationStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = 'location-status ' + (success ? 'success' : 'error');
+            statusDiv.style.display = 'block';
+        }
+        
+        // File upload handling
+        document.getElementById('photos').addEventListener('change', (e) => {
+            selectedFiles = Array.from(e.target.files);
+            displayFileList();
+        });
+        
+        function displayFileList() {
+            const fileList = document.getElementById('fileList');
+            if (selectedFiles.length === 0) {
+                fileList.innerHTML = '';
+                return;
+            }
+            
+            fileList.innerHTML = `<strong>נבחרו ${selectedFiles.length} תמונות:</strong><br>` +
+                selectedFiles.map(f => f.name).join(', ');
+        }
+        
+        // Form submission
+        document.getElementById('reportForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading"></span> שולח דיווח...';
+            
+            try {
+                // Upload photos first
+                const photoUrls = [];
+                if (selectedFiles.length > 0) {
+                    for (const file of selectedFiles) {
+                        const fileName = `${Date.now()}_${file.name}`;
+                        const { data, error } = await supabaseClient.storage
+                            .from('eport-photos')
+                            .upload(fileName, file);
+                        
+                        if (error) throw error;
+                        
+                        // Get public URL
+                        const { data: { publicUrl } } = supabaseClient.storage
+                            .from('eport-photos')
+                            .getPublicUrl(fileName);
+                        
+                        photoUrls.push(publicUrl);
+                    }
+                }
+                
+                // Insert report
+                const formData = {
+                    full_name: document.getElementById('fullName').value,
+                    date: document.getElementById('date').value,
+                    time: document.getElementById('time').value || null,
+                    species_id: document.getElementById('species').value,
+                    number_of_individuals: document.getElementById('numberOfIndividuals').value,
+                    latitude: parseFloat(document.getElementById('latitude').value),
+                    longitude: parseFloat(document.getElementById('longitude').value),
+                    location_description: document.getElementById('locationDescription').value,
+                    sighting_details: document.getElementById('sightingDetails').value || null,
+                    photo_urls: photoUrls.length > 0 ? photoUrls : null,
+                    additional_comments: document.getElementById('comments').value || null,
+                    contact_details: document.getElementById('contact').value || null
+                };
+                
+                const { data, error } = await supabase
+                    .from('reports')
+                    .insert([formData]);
+                
+                if (error) throw error;
+                
+                // Show success and reset form
+                showSuccess();
+                document.getElementById('reportForm').reset();
+                selectedFiles = [];
+                displayFileList();
+                setDefaultDate();
+                await loadSpecies(); // Reset species dropdown to default
+                document.getElementById('locationStatus').style.display = 'none';
+                
+            } catch (error) {
+                console.error('Error submitting report:', error);
+                showError('שגיאה בשליחת הדיווח. אנא נסו שוב.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'שלח דיווח';
+            }
+        });
+        
+        function showSuccess() {
+            const successMsg = document.getElementById('successMessage');
+            successMsg.classList.add('show');
+            
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                successMsg.classList.remove('show');
+            }, 5000);
+        }
+        
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMessage');
+            errorMsg.textContent = '❌ ' + message;
+            errorMsg.style.display = 'block';
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            setTimeout(() => {
+                errorMsg.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
