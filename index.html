@@ -330,9 +330,9 @@
             <!-- Location -->
             <div class="form-group">
                 <label>
-                    מיקום <span class="required">*</span>
+                    מיקום <span class="recommended">(מומלץ מאוד)</span>
                 </label>
-                <p class="help-text">לחצו על "קבל מיקום אוטומטי" או הזינו ידנית</p>
+                <p class="help-text">לחצו על "קבל מיקום אוטומטי" או הזינו ידנית. אם אין אפשרות, ניתן להשאיר ריק.</p>
                 <div class="location-capture">
                     <button type="button" class="btn-location" id="getLocationBtn">
                         📍 קבל מיקום אוטומטי
@@ -343,8 +343,8 @@
                 </div>
                 <div id="locationStatus" class="location-status" style="display:none;"></div>
                 
-                <input type="hidden" id="latitude" name="latitude" required>
-                <input type="hidden" id="longitude" name="longitude" required>
+                <input type="hidden" id="latitude" name="latitude">
+                <input type="hidden" id="longitude" name="longitude">
                 
                 <div id="manualInputs" style="display:none; margin-top:10px;">
                     <input type="text" id="manualLat" placeholder="קו רוחב (Latitude)" 
@@ -575,14 +575,17 @@
                 }
                 
                 // Insert report
+                const lat = document.getElementById('latitude').value;
+                const lng = document.getElementById('longitude').value;
+                
                 const formData = {
                     full_name: document.getElementById('fullName').value,
                     date: document.getElementById('date').value,
                     time: document.getElementById('time').value || null,
                     species_id: document.getElementById('species').value,
                     number_of_individuals: document.getElementById('numberOfIndividuals').value,
-                    latitude: parseFloat(document.getElementById('latitude').value),
-                    longitude: parseFloat(document.getElementById('longitude').value),
+                    latitude: lat ? parseFloat(lat) : null,
+                    longitude: lng ? parseFloat(lng) : null,
                     location_description: document.getElementById('locationDescription').value,
                     sighting_details: document.getElementById('sightingDetails').value || null,
                     photo_urls: photoUrls.length > 0 ? photoUrls : null,
