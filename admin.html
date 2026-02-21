@@ -874,6 +874,18 @@
                         </tr>
                     </tbody>
                 </table>
+                
+                <!-- Pagination Controls -->
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:20px; background:white; border-top:2px solid #e0e0e0;">
+                    <div style="color:#666;">
+                        מציג <strong id="recordsFrom">0</strong>-<strong id="recordsTo">0</strong> מתוך <strong id="totalRecords">0</strong> דיווחים
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button id="prevPage" class="btn btn-secondary" disabled>← הקודם</button>
+                        <span style="padding:8px 16px; color:#666;">עמוד <strong id="currentPage">1</strong> מתוך <strong id="totalPages">1</strong></span>
+                        <button id="nextPage" class="btn btn-secondary" disabled>הבא →</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -909,6 +921,12 @@
         let selectedArea = null;
         let filteredReports = [];
         let uniqueFamilies = [];
+        
+        // Pagination variables
+        let currentPage = 1;
+        let pageSize = 100;
+        let totalRecords = 0;
+        let currentFilters = {};
         
         // Check if user is logged in
         document.addEventListener('DOMContentLoaded', async () => {
@@ -1154,8 +1172,12 @@
         }
         
         // Load Reports
-        async function loadReports(filters = {}) {
+        async function loadReports(filters = {}, page = 1) {
             try {
+                currentFilters = filters;
+                currentPage = page;
+                
+                // Build query
                 let query = supabaseClient
                     .from('reports')
                     .select(`
@@ -1167,12 +1189,14 @@
                             family
                         )
                     `, { count: 'exact' })
-                    .order('created_at', { ascending: false })
-                    .limit(10000);  // Fetch up to 10,000 records
+                    .order('created_at', { ascending: false });
                 
                 // Apply filters
                 if (filters.status) {
                     query = query.eq('status', filters.status);
+                }
+                if (filters.family) {
+                    query = query.eq('species.family', filters.family);
                 }
                 if (filters.species_id) {
                     query = query.eq('species_id', filters.species_id);
@@ -1184,16 +1208,30 @@
                     query = query.lte('date', filters.dateTo);
                 }
                 
+                // Get total count first
+                const { count, error: countError } = await supabaseClient
+                    .from('reports')
+                    .select('*', { count: 'exact', head: true });
+                
+                if (!countError) {
+                    totalRecords = count;
+                }
+                
+                // Apply pagination
+                const from = (page - 1) * pageSize;
+                const to = from + pageSize - 1;
+                query = query.range(from, to);
+                
                 const { data, error } = await query;
                 
                 if (error) throw error;
                 
                 allReports = data;
                 
-                // Apply client-side filters (family and area)
+                // Apply client-side filters (family and area) - these work on current page only
                 let filtered = data;
                 
-                // Family filter
+                // Family filter (if needed for current page)
                 if (filters.family) {
                     filtered = filtered.filter(r => r.species && r.species.family === filters.family);
                 }
@@ -1210,6 +1248,7 @@
                 renderReports(filtered);
                 updateStats(filtered);
                 updateMap(filtered);
+                updatePagination();
             } catch (error) {
                 console.error('Error loading reports:', error);
                 showError('שגיאה בטעינת הדיווחים');
@@ -1464,11 +1503,62 @@
             loadReports();
         });
         
-        // Export All to CSV
+        // Export All to CSV - Fetch ALL data in chunks
         document.getElementById('exportAllBtn').addEventListener('click', async () => {
-            // Fetch ALL reports directly from database
             try {
-                const { data, error } = await supabaseClient
+                showSuccess('מייצא את כל הנתונים... נא להמתין');
+                
+                let allData = [];
+                let page = 0;
+                const chunkSize = 1000;
+                let hasMore = true;
+                
+                // Fetch all data in chunks
+                while (hasMore) {
+                    const from = page * chunkSize;
+                    const to = from + chunkSize - 1;
+                    
+                    const { data, error } = await supabaseClient
+                        .from('reports')
+                        .select(`
+                            *,
+                            species:species_id (
+                                id,
+                                common_name,
+                                scientific_name,
+                                family
+                            )
+                        `)
+                        .order('created_at', { ascending: false })
+                        .range(from, to);
+                    
+                    if (error) throw error;
+                    
+                    if (data && data.length > 0) {
+                        allData = allData.concat(data);
+                        hasMore = data.length === chunkSize;
+                        page++;
+                    } else {
+                        hasMore = false;
+                    }
+                }
+                
+                const csv = generateCSV(allData);
+                downloadCSV(csv, 'reports_all.csv');
+                showSuccess(`ייצוא הושלם: ${allData.length} דיווחים`);
+            } catch (error) {
+                console.error('Error exporting all:', error);
+                showError('שגיאה בייצוא כל הנתונים');
+            }
+        });
+        
+        // Export Filtered to CSV - Fetch ALL filtered data
+        document.getElementById('exportFilteredBtn').addEventListener('click', async () => {
+            try {
+                showSuccess('מייצא נתונים מסוננים... נא להמתין');
+                
+                // Build query with same filters
+                let query = supabaseClient
                     .from('reports')
                     .select(`
                         *,
@@ -1479,23 +1569,66 @@
                             family
                         )
                     `)
-                    .order('created_at', { ascending: false })
-                    .limit(50000);  // High limit to get everything
+                    .order('created_at', { ascending: false });
                 
-                if (error) throw error;
+                // Apply same filters as current view
+                if (currentFilters.status) {
+                    query = query.eq('status', currentFilters.status);
+                }
+                if (currentFilters.species_id) {
+                    query = query.eq('species_id', currentFilters.species_id);
+                }
+                if (currentFilters.dateFrom) {
+                    query = query.gte('date', currentFilters.dateFrom);
+                }
+                if (currentFilters.dateTo) {
+                    query = query.lte('date', currentFilters.dateTo);
+                }
                 
-                const csv = generateCSV(data);
-                downloadCSV(csv, 'reports_all.csv');
+                // Fetch in chunks
+                let allData = [];
+                let page = 0;
+                const chunkSize = 1000;
+                let hasMore = true;
+                
+                while (hasMore) {
+                    const from = page * chunkSize;
+                    const to = from + chunkSize - 1;
+                    
+                    const { data, error } = await query.range(from, to);
+                    
+                    if (error) throw error;
+                    
+                    if (data && data.length > 0) {
+                        allData = allData.concat(data);
+                        hasMore = data.length === chunkSize;
+                        page++;
+                    } else {
+                        hasMore = false;
+                    }
+                }
+                
+                // Apply client-side filters (family and area)
+                let filtered = allData;
+                
+                if (currentFilters.family) {
+                    filtered = filtered.filter(r => r.species && r.species.family === currentFilters.family);
+                }
+                
+                if (currentFilters.area) {
+                    filtered = filtered.filter(r => {
+                        if (!r.latitude || !r.longitude) return false;
+                        return isPointInBounds(r.latitude, r.longitude, currentFilters.area);
+                    });
+                }
+                
+                const csv = generateCSV(filtered);
+                downloadCSV(csv, 'reports_filtered.csv');
+                showSuccess(`ייצוא הושלם: ${filtered.length} דיווחים`);
             } catch (error) {
-                console.error('Error exporting all:', error);
-                showError('שגיאה בייצוא כל הנתונים');
+                console.error('Error exporting filtered:', error);
+                showError('שגיאה בייצוא נתונים מסוננים');
             }
-        });
-        
-        // Export Filtered to CSV
-        document.getElementById('exportFilteredBtn').addEventListener('click', () => {
-            const csv = generateCSV(filteredReports);
-            downloadCSV(csv, 'reports_filtered.csv');
         });
         
         // Map Drawing Controls
@@ -1610,6 +1743,39 @@
         function isPointInBounds(lat, lng, bounds) {
             return bounds.contains([lat, lng]);
         }
+        
+        // Pagination functions
+        function updatePagination() {
+            const totalPages = Math.ceil(totalRecords / pageSize);
+            const recordsFrom = ((currentPage - 1) * pageSize) + 1;
+            const recordsTo = Math.min(currentPage * pageSize, totalRecords);
+            
+            document.getElementById('currentPage').textContent = currentPage;
+            document.getElementById('totalPages').textContent = totalPages;
+            document.getElementById('recordsFrom').textContent = recordsFrom;
+            document.getElementById('recordsTo').textContent = recordsTo;
+            document.getElementById('totalRecords').textContent = totalRecords;
+            
+            // Enable/disable buttons
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
+        }
+        
+        // Pagination navigation
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('prevPage').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    loadReports(currentFilters, currentPage - 1);
+                }
+            });
+            
+            document.getElementById('nextPage').addEventListener('click', () => {
+                const totalPages = Math.ceil(totalRecords / pageSize);
+                if (currentPage < totalPages) {
+                    loadReports(currentFilters, currentPage + 1);
+                }
+            });
+        });
         
         function generateCSV(reports) {
             const headers = ['תאריך', 'שעה', 'שם מדווח', 'מין', 'שם מדעי', 'משפחה', 'כמות', 'קו רוחב', 'קו אורך', 'תיאור מיקום', 'פרטי תצפית', 'הערות', 'פרטי קשר', 'סטטוס', 'אומת ע"י', 'הערות אימות'];
