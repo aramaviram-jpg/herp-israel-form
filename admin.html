@@ -1305,20 +1305,17 @@
                 
                 allReports = data;
                 
-                // Apply client-side filters (family and area) - these work on current page only
+                // Apply client-side area filter
+                // If area filter exists, we need ALL data, not just current page
                 let filtered = data;
                 
-                // Family filter (if needed for current page)
-                if (filters.family) {
-                    filtered = filtered.filter(r => r.species && r.species.family === filters.family);
-                }
-                
-                // Area filter
                 if (filters.area) {
-                    filtered = filtered.filter(r => {
-                        if (!r.latitude || !r.longitude) return false;
-                        return isPointInBounds(r.latitude, r.longitude, filters.area);
-                    });
+                    // If area filter, we already loaded all data via loadMapData
+                    // Use that data instead
+                    filtered = allReportsForMap.slice((page - 1) * pageSize, page * pageSize);
+                    totalRecords = allReportsForMap.length;
+                } else if (filters.family) {
+                    filtered = filtered.filter(r => r.species && r.species.family === filters.family);
                 }
                 
                 filteredReports = filtered;
