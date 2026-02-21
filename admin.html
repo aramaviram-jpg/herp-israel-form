@@ -951,9 +951,10 @@
             document.getElementById('mapCount').textContent = reportsWithGPS.length;
             
             // Group reports by location (lat,lng as key)
+            // Round to 4 decimals (~10 meter precision) to group nearby reports
             const locationGroups = {};
             reportsWithGPS.forEach(report => {
-                const key = `${report.latitude.toFixed(6)},${report.longitude.toFixed(6)}`;
+                const key = `${report.latitude.toFixed(4)},${report.longitude.toFixed(4)}`;
                 if (!locationGroups[key]) {
                     locationGroups[key] = [];
                 }
@@ -1036,8 +1037,22 @@
             
             // Fit map to show all markers if there are any
             if (reportsWithGPS.length > 0) {
-                const bounds = L.latLngBounds(reportsWithGPS.map(r => [r.latitude, r.longitude]));
-                map.fitBounds(bounds, { padding: [50, 50] });
+                // Filter to Israel area only (ignore test data from other countries)
+                // Israel rough bounds: lat 29-33.5, lng 34-36
+                const israelReports = reportsWithGPS.filter(r => 
+                    r.latitude >= 29 && r.latitude <= 33.5 &&
+                    r.longitude >= 34 && r.longitude <= 36
+                );
+                
+                if (israelReports.length > 0) {
+                    // Use Israel reports for bounds
+                    const bounds = L.latLngBounds(israelReports.map(r => [r.latitude, r.longitude]));
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                } else {
+                    // No Israel reports, fall back to all reports
+                    const bounds = L.latLngBounds(reportsWithGPS.map(r => [r.latitude, r.longitude]));
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
             }
         }
         
@@ -1533,7 +1548,14 @@
                 fillOpacity: 0.15
             }).addTo(map);
             
+            // Re-enable map interactions
             map.getContainer().style.cursor = '';
+            map.dragging.enable();
+            map.touchZoom.enable();
+            map.doubleClickZoom.enable();
+            map.scrollWheelZoom.enable();
+            map.boxZoom.enable();
+            map.keyboard.enable();
             
             const btn = document.getElementById('drawAreaBtn');
             btn.classList.remove('active');
