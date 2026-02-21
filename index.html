@@ -524,6 +524,27 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await loadSpecies();
             setDefaultDate();
+            
+            // Map modal event listeners
+            document.getElementById('confirmLocation').addEventListener('click', () => {
+                if (selectedCoordinates) {
+                    document.getElementById('latitude').value = selectedCoordinates.lat;
+                    document.getElementById('longitude').value = selectedCoordinates.lng;
+                    showLocationStatus(`✅ מיקום נבחר במפה: ${selectedCoordinates.lat.toFixed(6)}, ${selectedCoordinates.lng.toFixed(6)}`, true);
+                    closeMapModal();
+                }
+            });
+            
+            document.getElementById('closeMapModal').addEventListener('click', () => {
+                closeMapModal();
+            });
+            
+            // Close modal when clicking outside
+            document.getElementById('mapModal').addEventListener('click', (e) => {
+                if (e.target.id === 'mapModal') {
+                    closeMapModal();
+                }
+            });
         });
         
         // Load species from database
@@ -645,28 +666,9 @@
             `).openPopup();
         }
         
-        document.getElementById('confirmLocation').addEventListener('click', () => {
-            if (selectedCoordinates) {
-                document.getElementById('latitude').value = selectedCoordinates.lat;
-                document.getElementById('longitude').value = selectedCoordinates.lng;
-                showLocationStatus(`✅ מיקום נבחר במפה: ${selectedCoordinates.lat.toFixed(6)}, ${selectedCoordinates.lng.toFixed(6)}`, true);
-                closeMapModal();
-            }
-        });
-        
-        document.getElementById('closeMapModal').addEventListener('click', () => {
-            closeMapModal();
-        });
-        
-        // Close modal when clicking outside
-        document.getElementById('mapModal').addEventListener('click', (e) => {
-            if (e.target.id === 'mapModal') {
-                closeMapModal();
-            }
-        });
-        
         function closeMapModal() {
             document.getElementById('mapModal').classList.remove('active');
+        }
         }
         
         // Manual location entry
