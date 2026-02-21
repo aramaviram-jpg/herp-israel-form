@@ -1465,9 +1465,31 @@
         });
         
         // Export All to CSV
-        document.getElementById('exportAllBtn').addEventListener('click', () => {
-            const csv = generateCSV(allReports);
-            downloadCSV(csv, 'reports_all.csv');
+        document.getElementById('exportAllBtn').addEventListener('click', async () => {
+            // Fetch ALL reports directly from database
+            try {
+                const { data, error } = await supabaseClient
+                    .from('reports')
+                    .select(`
+                        *,
+                        species:species_id (
+                            id,
+                            common_name,
+                            scientific_name,
+                            family
+                        )
+                    `)
+                    .order('created_at', { ascending: false })
+                    .limit(50000);  // High limit to get everything
+                
+                if (error) throw error;
+                
+                const csv = generateCSV(data);
+                downloadCSV(csv, 'reports_all.csv');
+            } catch (error) {
+                console.error('Error exporting all:', error);
+                showError('שגיאה בייצוא כל הנתונים');
+            }
         });
         
         // Export Filtered to CSV
