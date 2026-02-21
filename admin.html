@@ -1570,7 +1570,8 @@
                 dateTo: document.getElementById('filterDateTo').value,
                 area: selectedArea
             };
-            loadReports(filters);
+            loadReports(filters, 1);
+            loadMapData(filters);
         });
         
         // Clear Filters
@@ -1581,7 +1582,8 @@
             document.getElementById('filterDateFrom').value = '';
             document.getElementById('filterDateTo').value = '';
             clearAreaSelection();
-            loadReports();
+            loadReports({}, 1);
+            loadMapData({});
         });
         
         // Export All to CSV - Fetch ALL data in chunks
@@ -1727,7 +1729,8 @@
                 dateFrom: document.getElementById('filterDateFrom').value,
                 dateTo: document.getElementById('filterDateTo').value
             };
-            loadReports(filters);
+            loadReports(filters, 1);
+            loadMapData(filters);
         });
         
         // Drawing Functions
@@ -1800,7 +1803,7 @@
             
             document.getElementById('clearAreaBtn').style.display = 'inline-block';
             
-            // Apply filters with area
+            // Apply filters with area to both table and map
             const filters = {
                 status: document.getElementById('filterStatus').value,
                 family: document.getElementById('filterFamily').value,
@@ -1809,7 +1812,10 @@
                 dateTo: document.getElementById('filterDateTo').value,
                 area: selectedArea
             };
-            loadReports(filters);
+            
+            // Reload both table (paginated) and map (all data with filter)
+            loadReports(filters, 1);
+            loadMapData(filters);
         }
         
         function clearAreaSelection() {
