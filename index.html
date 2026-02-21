@@ -524,27 +524,6 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await loadSpecies();
             setDefaultDate();
-            
-            // Map modal event listeners
-            document.getElementById('confirmLocation').addEventListener('click', () => {
-                if (selectedCoordinates) {
-                    document.getElementById('latitude').value = selectedCoordinates.lat;
-                    document.getElementById('longitude').value = selectedCoordinates.lng;
-                    showLocationStatus(`✅ מיקום נבחר במפה: ${selectedCoordinates.lat.toFixed(6)}, ${selectedCoordinates.lng.toFixed(6)}`, true);
-                    closeMapModal();
-                }
-            });
-            
-            document.getElementById('closeMapModal').addEventListener('click', () => {
-                closeMapModal();
-            });
-            
-            // Close modal when clicking outside
-            document.getElementById('mapModal').addEventListener('click', (e) => {
-                if (e.target.id === 'mapModal') {
-                    closeMapModal();
-                }
-            });
         });
         
         // Load species from database
@@ -812,6 +791,38 @@
                 errorMsg.style.display = 'none';
             }, 5000);
         }
+        
+        // Map modal event listeners - wait for DOM to be ready
+        window.addEventListener('load', () => {
+            const confirmBtn = document.getElementById('confirmLocation');
+            const closeBtn = document.getElementById('closeMapModal');
+            const modal = document.getElementById('mapModal');
+            
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', () => {
+                    if (selectedCoordinates) {
+                        document.getElementById('latitude').value = selectedCoordinates.lat;
+                        document.getElementById('longitude').value = selectedCoordinates.lng;
+                        showLocationStatus(`✅ מיקום נבחר במפה: ${selectedCoordinates.lat.toFixed(6)}, ${selectedCoordinates.lng.toFixed(6)}`, true);
+                        closeMapModal();
+                    }
+                });
+            }
+            
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    closeMapModal();
+                });
+            }
+            
+            if (modal) {
+                modal.addEventListener('click', (e) => {
+                    if (e.target.id === 'mapModal') {
+                        closeMapModal();
+                    }
+                });
+            }
+        });
     </script>
     
     <!-- Map Selection Modal -->
