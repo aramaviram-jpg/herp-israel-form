@@ -576,6 +576,37 @@
             background: #e74c3c;
         }
         
+        .map-controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .map-control-btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .map-control-btn:hover {
+            background: #5568d3;
+        }
+        
+        .map-control-btn.active {
+            background: #10b981;
+        }
+        
+        .map-control-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
         /* Mobile Responsive Styles */
         @media (max-width: 768px) {
             .header-content {
@@ -765,6 +796,12 @@
                         </select>
                     </div>
                     <div class="filter-group">
+                        <label>משפחה</label>
+                        <select id="filterFamily">
+                            <option value="">הכל</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
                         <label>מין</label>
                         <select id="filterSpecies">
                             <option value="">הכל</option>
@@ -782,7 +819,8 @@
                 <div class="filter-actions">
                     <button class="btn btn-primary" id="applyFilters">החל סינון</button>
                     <button class="btn btn-secondary" id="clearFilters">נקה</button>
-                    <button class="btn btn-secondary" id="exportBtn">ייצא ל-CSV</button>
+                    <button class="btn btn-secondary" id="exportAllBtn">ייצא הכל ל-CSV</button>
+                    <button class="btn btn-secondary" id="exportFilteredBtn">ייצא מסונן ל-CSV</button>
                 </div>
             </div>
             
@@ -792,6 +830,10 @@
             <!-- Map View -->
             <div class="map-container">
                 <h2>🗺️ מפת תצפיות</h2>
+                <div class="map-controls">
+                    <button class="map-control-btn" id="drawAreaBtn">📐 בחר אזור במפה</button>
+                    <button class="map-control-btn" id="clearAreaBtn" style="display:none;">✖ נקה בחירת אזור</button>
+                </div>
                 <div id="map"></div>
                 <div class="map-legend">
                     <div class="legend-item">
@@ -863,6 +905,10 @@
         let currentReport = null;
         let map = null;
         let markersLayer = null;
+        let drawingRectangle = null;
+        let selectedArea = null;
+        let filteredReports = [];
+        let uniqueFamilies = [];
         
         // Check if user is logged in
         document.addEventListener('DOMContentLoaded', async () => {
@@ -1019,13 +1065,25 @@
                 
                 allSpecies = data;
                 
-                // Populate filter dropdown
+                // Get unique families
+                uniqueFamilies = [...new Set(data.map(s => s.family).filter(f => f && f !== 'NULL'))].sort();
+                
+                // Populate species filter dropdown
                 const filterSelect = document.getElementById('filterSpecies');
                 data.forEach(species => {
                     const option = document.createElement('option');
                     option.value = species.id;
                     option.textContent = species.common_name;
                     filterSelect.appendChild(option);
+                });
+                
+                // Populate family filter dropdown
+                const familySelect = document.getElementById('filterFamily');
+                uniqueFamilies.forEach(family => {
+                    const option = document.createElement('option');
+                    option.value = family;
+                    option.textContent = family;
+                    familySelect.appendChild(option);
                 });
             } catch (error) {
                 console.error('Error loading species:', error);
@@ -1067,9 +1125,27 @@
                 if (error) throw error;
                 
                 allReports = data;
-                renderReports(data);
-                updateStats(data);
-                updateMap(data);
+                
+                // Apply client-side filters (family and area)
+                let filtered = data;
+                
+                // Family filter
+                if (filters.family) {
+                    filtered = filtered.filter(r => r.species && r.species.family === filters.family);
+                }
+                
+                // Area filter
+                if (filters.area) {
+                    filtered = filtered.filter(r => {
+                        if (!r.latitude || !r.longitude) return false;
+                        return isPointInBounds(r.latitude, r.longitude, filters.area);
+                    });
+                }
+                
+                filteredReports = filtered;
+                renderReports(filtered);
+                updateStats(filtered);
+                updateMap(filtered);
             } catch (error) {
                 console.error('Error loading reports:', error);
                 showError('שגיאה בטעינת הדיווחים');
@@ -1304,9 +1380,11 @@
         document.getElementById('applyFilters').addEventListener('click', () => {
             const filters = {
                 status: document.getElementById('filterStatus').value,
+                family: document.getElementById('filterFamily').value,
                 species_id: document.getElementById('filterSpecies').value,
                 dateFrom: document.getElementById('filterDateFrom').value,
-                dateTo: document.getElementById('filterDateTo').value
+                dateTo: document.getElementById('filterDateTo').value,
+                area: selectedArea
             };
             loadReports(filters);
         });
@@ -1314,17 +1392,131 @@
         // Clear Filters
         document.getElementById('clearFilters').addEventListener('click', () => {
             document.getElementById('filterStatus').value = '';
+            document.getElementById('filterFamily').value = '';
             document.getElementById('filterSpecies').value = '';
             document.getElementById('filterDateFrom').value = '';
             document.getElementById('filterDateTo').value = '';
+            clearAreaSelection();
             loadReports();
         });
         
-        // Export to CSV
-        document.getElementById('exportBtn').addEventListener('click', () => {
+        // Export All to CSV
+        document.getElementById('exportAllBtn').addEventListener('click', () => {
             const csv = generateCSV(allReports);
-            downloadCSV(csv, 'reports.csv');
+            downloadCSV(csv, 'reports_all.csv');
         });
+        
+        // Export Filtered to CSV
+        document.getElementById('exportFilteredBtn').addEventListener('click', () => {
+            const csv = generateCSV(filteredReports);
+            downloadCSV(csv, 'reports_filtered.csv');
+        });
+        
+        // Map Drawing Controls
+        document.getElementById('drawAreaBtn').addEventListener('click', () => {
+            startDrawing();
+        });
+        
+        document.getElementById('clearAreaBtn').addEventListener('click', () => {
+            clearAreaSelection();
+            // Re-apply other filters without area
+            const filters = {
+                status: document.getElementById('filterStatus').value,
+                family: document.getElementById('filterFamily').value,
+                species_id: document.getElementById('filterSpecies').value,
+                dateFrom: document.getElementById('filterDateFrom').value,
+                dateTo: document.getElementById('filterDateTo').value
+            };
+            loadReports(filters);
+        });
+        
+        // Drawing Functions
+        function startDrawing() {
+            if (!map) return;
+            
+            const btn = document.getElementById('drawAreaBtn');
+            btn.classList.add('active');
+            btn.textContent = '📐 לחץ במפה כדי לצייר';
+            
+            map.getContainer().style.cursor = 'crosshair';
+            
+            let startLatLng = null;
+            
+            const onMapClick = (e) => {
+                if (!startLatLng) {
+                    startLatLng = e.latlng;
+                } else {
+                    const bounds = L.latLngBounds(startLatLng, e.latlng);
+                    finishDrawing(bounds);
+                    map.off('click', onMapClick);
+                    map.off('mousemove', onMapMove);
+                }
+            };
+            
+            const onMapMove = (e) => {
+                if (startLatLng && drawingRectangle) {
+                    map.removeLayer(drawingRectangle);
+                }
+                if (startLatLng) {
+                    const bounds = L.latLngBounds(startLatLng, e.latlng);
+                    drawingRectangle = L.rectangle(bounds, {
+                        color: '#667eea',
+                        weight: 2,
+                        fillOpacity: 0.2
+                    }).addTo(map);
+                }
+            };
+            
+            map.on('click', onMapClick);
+            map.on('mousemove', onMapMove);
+        }
+        
+        function finishDrawing(bounds) {
+            if (drawingRectangle) {
+                map.removeLayer(drawingRectangle);
+            }
+            
+            selectedArea = bounds;
+            
+            // Draw permanent rectangle
+            drawingRectangle = L.rectangle(bounds, {
+                color: '#10b981',
+                weight: 3,
+                fillOpacity: 0.15
+            }).addTo(map);
+            
+            map.getContainer().style.cursor = '';
+            
+            const btn = document.getElementById('drawAreaBtn');
+            btn.classList.remove('active');
+            btn.textContent = '📐 בחר אזור במפה';
+            
+            document.getElementById('clearAreaBtn').style.display = 'inline-block';
+            
+            // Apply filters with area
+            const filters = {
+                status: document.getElementById('filterStatus').value,
+                family: document.getElementById('filterFamily').value,
+                species_id: document.getElementById('filterSpecies').value,
+                dateFrom: document.getElementById('filterDateFrom').value,
+                dateTo: document.getElementById('filterDateTo').value,
+                area: selectedArea
+            };
+            loadReports(filters);
+        }
+        
+        function clearAreaSelection() {
+            if (drawingRectangle) {
+                map.removeLayer(drawingRectangle);
+                drawingRectangle = null;
+            }
+            selectedArea = null;
+            document.getElementById('clearAreaBtn').style.display = 'none';
+        }
+        
+        function isPointInBounds(lat, lng, bounds) {
+            return bounds.contains([lat, lng]);
+        }
         
         function generateCSV(reports) {
             const headers = ['תאריך', 'שעה', 'שם מדווח', 'מין', 'שם מדעי', 'משפחה', 'כמות', 'קו רוחב', 'קו אורך', 'תיאור מיקום', 'פרטי תצפית', 'הערות', 'פרטי קשר', 'סטטוס', 'אומת ע"י', 'הערות אימות'];
