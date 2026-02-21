@@ -480,6 +480,123 @@
             color: #999;
             font-style: italic;
         }
+        
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .header h1 {
+                font-size: 18px;
+            }
+            
+            .user-info {
+                font-size: 14px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .stat-card .number {
+                font-size: 24px;
+            }
+            
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filter-actions {
+                flex-direction: column;
+            }
+            
+            .filter-actions .btn {
+                width: 100%;
+            }
+            
+            /* Make table scrollable on mobile */
+            .reports-table {
+                overflow-x: auto;
+            }
+            
+            table {
+                min-width: 800px;
+            }
+            
+            th, td {
+                padding: 10px 8px;
+                font-size: 14px;
+            }
+            
+            .action-btn {
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+            
+            /* Modal adjustments */
+            .modal-content {
+                margin: 10px;
+                max-height: 95vh;
+            }
+            
+            .modal-header h2 {
+                font-size: 18px;
+            }
+            
+            .detail-label {
+                font-size: 13px;
+            }
+            
+            .detail-value {
+                font-size: 14px;
+            }
+            
+            .photos-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .validation-actions {
+                flex-direction: column;
+            }
+            
+            .validation-actions .btn {
+                width: 100%;
+            }
+            
+            /* Login page mobile */
+            .login-box {
+                margin: 20px;
+                padding: 30px 20px;
+            }
+            
+            .login-box h1 {
+                font-size: 20px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-card .number {
+                font-size: 20px;
+            }
+            
+            .main-content {
+                padding: 10px;
+            }
+            
+            .filters, .reports-table {
+                border-radius: 4px;
+            }
+            
+            .photos-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
