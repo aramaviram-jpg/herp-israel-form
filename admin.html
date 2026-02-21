@@ -950,11 +950,22 @@
             // Update count
             document.getElementById('mapCount').textContent = reportsWithGPS.length;
             
-            // Add markers
+            // Group reports by location (lat,lng as key)
+            const locationGroups = {};
             reportsWithGPS.forEach(report => {
-                const color = getMarkerColor(report.status);
+                const key = `${report.latitude.toFixed(6)},${report.longitude.toFixed(6)}`;
+                if (!locationGroups[key]) {
+                    locationGroups[key] = [];
+                }
+                locationGroups[key].push(report);
+            });
+            
+            // Add markers for each location group
+            Object.entries(locationGroups).forEach(([locationKey, reportsAtLocation]) => {
+                const firstReport = reportsAtLocation[0];
+                const color = getMarkerColor(firstReport.status);
                 
-                const marker = L.circleMarker([report.latitude, report.longitude], {
+                const marker = L.circleMarker([firstReport.latitude, firstReport.longitude], {
                     radius: 8,
                     fillColor: color,
                     color: '#333',
@@ -963,26 +974,60 @@
                     fillOpacity: 0.8
                 });
                 
-                // Popup content
-                const popupContent = `
-                    <div class="popup-content">
-                        <h3>${report.species ? report.species.common_name : 'לא מזוהה'}</h3>
-                        ${report.species && report.species.scientific_name ? 
-                            `<div class="detail"><em>${report.species.scientific_name}</em></div>` : ''}
-                        <div class="detail"><strong>תאריך:</strong> ${formatDate(report.date)}</div>
-                        <div class="detail"><strong>מדווח:</strong> ${report.full_name}</div>
-                        <div class="detail"><strong>כמות:</strong> ${report.number_of_individuals}</div>
-                        <div class="detail"><strong>סטטוס:</strong> 
-                            <span class="status-badge status-${getStatusClass(report.status)}">${report.status}</span>
+                // Popup content - show all reports at this location
+                let popupContent = '';
+                
+                if (reportsAtLocation.length > 1) {
+                    // Multiple reports at same location
+                    popupContent = `
+                        <div class="popup-content">
+                            <h3 style="color:#667eea;">${reportsAtLocation.length} דיווחים במיקום זה</h3>
+                            <div style="max-height:300px;overflow-y:auto;">
+                    `;
+                    
+                    reportsAtLocation.forEach((report, index) => {
+                        popupContent += `
+                            <div style="border-top:${index > 0 ? '2px solid #e0e0e0' : 'none'};padding-top:${index > 0 ? '10px' : '0'};margin-top:${index > 0 ? '10px' : '0'};">
+                                <h4 style="margin-bottom:5px;">${report.species ? report.species.common_name : 'לא מזוהה'}</h4>
+                                ${report.species && report.species.scientific_name ? 
+                                    `<div class="detail"><em>${report.species.scientific_name}</em></div>` : ''}
+                                <div class="detail"><strong>תאריך:</strong> ${formatDate(report.date)}</div>
+                                <div class="detail"><strong>מדווח:</strong> ${report.full_name}</div>
+                                <div class="detail"><strong>סטטוס:</strong> 
+                                    <span class="status-badge status-${getStatusClass(report.status)}">${report.status}</span>
+                                </div>
+                                <button class="view-details-btn" onclick="viewReport(${report.id})" style="margin-top:8px;">צפה בדיווח</button>
+                            </div>
+                        `;
+                    });
+                    
+                    popupContent += `
+                            </div>
                         </div>
-                        ${report.location_description ? 
-                            `<div class="detail"><strong>מיקום:</strong> ${report.location_description}</div>` : ''}
-                        <button class="view-details-btn" onclick="viewReport(${report.id})">צפה בפרטים המלאים</button>
-                    </div>
-                `;
+                    `;
+                } else {
+                    // Single report at this location
+                    const report = reportsAtLocation[0];
+                    popupContent = `
+                        <div class="popup-content">
+                            <h3>${report.species ? report.species.common_name : 'לא מזוהה'}</h3>
+                            ${report.species && report.species.scientific_name ? 
+                                `<div class="detail"><em>${report.species.scientific_name}</em></div>` : ''}
+                            <div class="detail"><strong>תאריך:</strong> ${formatDate(report.date)}</div>
+                            <div class="detail"><strong>מדווח:</strong> ${report.full_name}</div>
+                            <div class="detail"><strong>כמות:</strong> ${report.number_of_individuals}</div>
+                            <div class="detail"><strong>סטטוס:</strong> 
+                                <span class="status-badge status-${getStatusClass(report.status)}">${report.status}</span>
+                            </div>
+                            ${report.location_description ? 
+                                `<div class="detail"><strong>מיקום:</strong> ${report.location_description}</div>` : ''}
+                            <button class="view-details-btn" onclick="viewReport(${report.id})">צפה בפרטים המלאים</button>
+                        </div>
+                    `;
+                }
                 
                 marker.bindPopup(popupContent, {
-                    maxWidth: 300,
+                    maxWidth: 350,
                     direction: 'top'
                 });
                 
