@@ -927,6 +927,7 @@
         let pageSize = 100;
         let totalRecords = 0;
         let currentFilters = {};
+        let allReportsForMap = [];  // Separate data for map (all records)
         
         // Check if user is logged in
         document.addEventListener('DOMContentLoaded', async () => {
@@ -1171,6 +1172,82 @@
             }
         }
         
+        // Load all reports for map (separate from paginated table data)
+        async function loadMapData(filters = {}) {
+            try {
+                // Build query with filters
+                let baseQuery = supabaseClient
+                    .from('reports')
+                    .select(`
+                        *,
+                        species:species_id (
+                            id,
+                            common_name,
+                            scientific_name,
+                            family
+                        )
+                    `)
+                    .order('created_at', { ascending: false });
+                
+                // Apply server-side filters
+                if (filters.status) {
+                    baseQuery = baseQuery.eq('status', filters.status);
+                }
+                if (filters.species_id) {
+                    baseQuery = baseQuery.eq('species_id', filters.species_id);
+                }
+                if (filters.dateFrom) {
+                    baseQuery = baseQuery.gte('date', filters.dateFrom);
+                }
+                if (filters.dateTo) {
+                    baseQuery = baseQuery.lte('date', filters.dateTo);
+                }
+                
+                // Fetch all data in chunks for map
+                let allData = [];
+                let page = 0;
+                const chunkSize = 1000;
+                let hasMore = true;
+                
+                while (hasMore) {
+                    const from = page * chunkSize;
+                    const to = from + chunkSize - 1;
+                    
+                    const { data, error } = await baseQuery.range(from, to);
+                    
+                    if (error) throw error;
+                    
+                    if (data && data.length > 0) {
+                        allData = allData.concat(data);
+                        hasMore = data.length === chunkSize;
+                        page++;
+                    } else {
+                        hasMore = false;
+                    }
+                }
+                
+                // Apply client-side filters
+                let filtered = allData;
+                
+                if (filters.family) {
+                    filtered = filtered.filter(r => r.species && r.species.family === filters.family);
+                }
+                
+                if (filters.area) {
+                    filtered = filtered.filter(r => {
+                        if (!r.latitude || !r.longitude) return false;
+                        return isPointInBounds(r.latitude, r.longitude, filters.area);
+                    });
+                }
+                
+                allReportsForMap = filtered;
+                updateMap(filtered);
+                updateStats(filtered);
+            } catch (error) {
+                console.error('Error loading map data:', error);
+            }
+        }
+        
         // Load Reports
         async function loadReports(filters = {}, page = 1) {
             try {
@@ -1246,9 +1323,13 @@
                 
                 filteredReports = filtered;
                 renderReports(filtered);
-                updateStats(filtered);
-                updateMap(filtered);
                 updatePagination();
+                
+                // Load map data separately (all records, not paginated)
+                if (page === 1) {
+                    // Only reload map data when filters change or on first page
+                    loadMapData(filters);
+                }
             } catch (error) {
                 console.error('Error loading reports:', error);
                 showError('שגיאה בטעינת הדיווחים');
