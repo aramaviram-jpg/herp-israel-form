@@ -797,16 +797,12 @@
                     </div>
                     <div class="filter-group">
                         <label>משפחה</label>
-                        <input type="text" id="familySearch" placeholder="🔍 חפש משפחה..." 
-                               style="width:100%;padding:8px;margin-bottom:5px;border:2px solid #e0e0e0;border-radius:6px;">
                         <select id="filterFamily">
                             <option value="">הכל</option>
                         </select>
                     </div>
                     <div class="filter-group">
                         <label>מין</label>
-                        <input type="text" id="speciesFilterSearch" placeholder="🔍 חפש מין..." 
-                               style="width:100%;padding:8px;margin-bottom:5px;border:2px solid #e0e0e0;border-radius:6px;">
                         <select id="filterSpecies">
                             <option value="">הכל</option>
                         </select>
@@ -1091,38 +1087,6 @@
                     option.value = family;
                     option.textContent = family;
                     familySelect.appendChild(option);
-                });
-                
-                // Add family search functionality
-                const familySearch = document.getElementById('familySearch');
-                familySearch.addEventListener('input', (e) => {
-                    const searchTerm = e.target.value.toLowerCase();
-                    const options = familySelect.options;
-                    
-                    for (let i = 0; i < options.length; i++) {
-                        const optionText = options[i].textContent.toLowerCase();
-                        if (optionText.includes(searchTerm) || options[i].value === '') {
-                            options[i].style.display = '';
-                        } else {
-                            options[i].style.display = 'none';
-                        }
-                    }
-                });
-                
-                // Add species search functionality
-                const speciesSearch = document.getElementById('speciesFilterSearch');
-                speciesSearch.addEventListener('input', (e) => {
-                    const searchTerm = e.target.value.toLowerCase();
-                    const options = filterSelect.options;
-                    
-                    for (let i = 0; i < options.length; i++) {
-                        const optionText = options[i].textContent.toLowerCase();
-                        if (optionText.includes(searchTerm) || options[i].value === '') {
-                            options[i].style.display = '';
-                        } else {
-                            options[i].style.display = 'none';
-                        }
-                    }
                 });
             } catch (error) {
                 console.error('Error loading species:', error);
