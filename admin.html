@@ -799,7 +799,7 @@
                         <label>משפחה</label>
                         <input type="text" id="familySearch" placeholder="🔍 חפש משפחה..." 
                                style="width:100%;padding:8px;margin-bottom:5px;border:2px solid #e0e0e0;border-radius:6px;">
-                        <select id="filterFamily" size="5" style="height:auto;">
+                        <select id="filterFamily">
                             <option value="">הכל</option>
                         </select>
                     </div>
@@ -807,7 +807,7 @@
                         <label>מין</label>
                         <input type="text" id="speciesFilterSearch" placeholder="🔍 חפש מין..." 
                                style="width:100%;padding:8px;margin-bottom:5px;border:2px solid #e0e0e0;border-radius:6px;">
-                        <select id="filterSpecies" size="5" style="height:auto;">
+                        <select id="filterSpecies">
                             <option value="">הכל</option>
                         </select>
                     </div>
@@ -925,6 +925,9 @@
         
         // Initialize Map
         function initMap() {
+            // Don't re-initialize if already exists
+            if (map) return;
+            
             // Center on Israel
             map = L.map('map').setView([31.5, 34.8], 8);
             
