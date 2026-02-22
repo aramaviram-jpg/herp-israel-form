@@ -1362,7 +1362,7 @@
         // View Report Detail
         async function viewReport(reportId) {
             try {
-                const report = allReports.find(r => r.id === reportId);
+                const report = allReportsForMap.find(r => r.id === reportId);
                 if (!report) return;
                 
                 currentReport = report;
