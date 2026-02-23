@@ -1609,6 +1609,7 @@
                                 family
                             )
                         `)
+                        .neq('status', 'Rejected')
                         .order('created_at', { ascending: false })
                         .range(from, to);
                     
@@ -1649,6 +1650,7 @@
                             family
                         )
                     `)
+                    .neq('status', 'Rejected')
                     .order('created_at', { ascending: false });
                 
                 // Apply same filters as current view
