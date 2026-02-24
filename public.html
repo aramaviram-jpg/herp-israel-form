@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>הרפ ישראל | מפת תצפיות</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --green:     #3fb950;
+      --green-dim: #1a4a28;
+      --amber:     #d29922;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --accent:    #58a6ff;
+      --font-body: 'Heebo', sans-serif;
+      --font-mono: 'Space Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      direction: rtl;
+    }
+
+    /* ── NOISE TEXTURE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.5;
+    }
+
+    /* ── HEADER ── */
+    header {
+      position: relative;
+      z-index: 10;
+      padding: 0 2rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      background: rgba(22, 27, 34, 0.92);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--green-dim);
+      border: 1px solid var(--green);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .logo-text {
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--green);
+      letter-spacing: 0.05em;
+    }
+
+    .logo-sub {
+      font-size: 0.7rem;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      letter-spacing: 0.08em;
+    }
+
+    .header-cta {
+      background: var(--green);
+      color: #0d1117;
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 0.875rem;
+      padding: 0.5rem 1.25rem;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .header-cta:hover { background: #4cca5a; transform: translateY(-1px); }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      z-index: 1;
+      padding: 5rem 2rem 4rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .hero-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--green);
+      text-transform: uppercase;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .hero-label::before {
+      content: '';
+      display: block;
+      width: 2rem;
+      height: 1px;
+      background: var(--green);
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 span {
+      color: var(--green);
+    }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 600px;
+      line-height: 1.8;
+      margin-bottom: 3rem;
+    }
+
+    /* ── STATS GRID ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 3rem;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      padding: 1.75rem;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.2s;
+    }
+
+    .stat-card:hover { background: #1c2230; }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 60px; height: 60px;
+      border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border);  /* decorative corner */
+      opacity: 0.3;
+    }
+
+    .stat-label {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+    }
+
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1;
+      margin-bottom: 0.25rem;
+      transition: opacity 0.3s;
+    }
+
+    .stat-value.loading { opacity: 0.3; }
+
+    .stat-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .stat-icon {
+      position: absolute;
+      top: 1.25rem;
+      left: 1.25rem;
+      font-size: 1.4rem;
+      opacity: 0.15;
+    }
+
+    /* ── SECTION HEADER ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .section-title {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .section-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── MAIN LAYOUT ── */
+    .main-content {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 2rem 4rem;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .main-content { grid-template-columns: 1fr; }
+    }
+
+    /* ── MAP ── */
+    .map-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .map-panel-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .map-panel-title {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--green);
+      letter-spacing: 0.1em;
+    }
+
+    .live-dot {
+      width: 6px; height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+
+    #map {
+      height: 500px;
+      width: 100%;
+    }
+
+    .map-legend {
+      padding: 0.75rem 1.25rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 1.5rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .legend-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* ── RECENT SIGHTINGS ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .sighting-list {
+      list-style: none;
+    }
+
+    .sighting-item {
+      padding: 0.9rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      transition: background 0.15s;
+      animation: fadeIn 0.4s ease both;
+    }
+
+    .sighting-item:last-child { border-bottom: none; }
+    .sighting-item:hover { background: rgba(255,255,255,0.03); }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .sighting-species {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    .sighting-sci {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--accent);
+      font-style: italic;
+    }
+
+    .sighting-meta {
+      display: flex;
+      gap: 0.75rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+
+    /* ── TOP SPECIES ── */
+    .species-bar-list {
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .species-bar-item {}
+
+    .species-bar-top {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.3rem;
+      font-size: 0.8rem;
+    }
+
+    .species-name { color: var(--text); }
+    .species-count {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .bar-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: var(--green);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-text {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+
+    .footer-link {
+      color: var(--green);
+      text-decoration: none;
+    }
+
+    .footer-link:hover { text-decoration: underline; }
+
+    /* ── LOADING SKELETON ── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--border) 25%, #2a3140 50%, var(--border) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+      height: 1em;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ── MAP POPUP ── */
+    .leaflet-popup-content-wrapper {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--font-body);
+      direction: rtl;
+    }
+
+    .leaflet-popup-tip { background: var(--surface); }
+
+    .popup-species { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.3rem; }
+    .popup-sci { font-style: italic; font-size: 0.75rem; color: var(--accent); font-family: var(--font-mono); margin-bottom: 0.5rem; }
+    .popup-meta { font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🦎</div>
+    <div>
+      <div class="logo-text">HERP ISRAEL</div>
+      <div class="logo-sub">מאגר דו-חיים ועקבים</div>
+    </div>
+  </div>
+  <a href="https://herp-israel-form.vercel.app" class="header-cta">דיווח תצפית חדשה ←</a>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-label">מדע אזרחי | ישראל</div>
+  <h1>מעקב <span>דו-חיים ועקבים</span><br/>ברחבי ישראל</h1>
+  <p>
+    פלטפורמת מדע אזרחי לתיעוד ומיפוי זוחלים ודו-חיים בישראל.
+    כל דיווח תורם למחקר, לשימור ולהבנת הפיזור הגאוגרפי של המינים.
+  </p>
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">📍</div>
+      <div class="stat-label">סה״כ תצפיות</div>
+      <div class="stat-value loading" id="stat-total">—</div>
+      <div class="stat-sub">דיווחים במאגר</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-label">תצפיות מאומתות</div>
+      <div class="stat-value loading" id="stat-validated">—</div>
+      <div class="stat-sub">אומתו על ידי מומחים</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🔬</div>
+      <div class="stat-label">מינים מתועדים</div>
+      <div class="stat-value loading" id="stat-species">—</div>
+      <div class="stat-sub">מתוך 102 מינים</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📅</div>
+      <div class="stat-label">ב-30 הימים האחרונים</div>
+      <div class="stat-value loading" id="stat-recent">—</div>
+      <div class="stat-sub">תצפיות חדשות</div>
+    </div>
+  </div>
+</section>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+
+  <!-- MAP -->
+  <div class="map-panel">
+    <div class="map-panel-header">
+      <span class="map-panel-title">מפת תצפיות מאומתות</span>
+      <span class="live-badge"><span class="live-dot"></span>LIVE</span>
+    </div>
+    <div id="map"></div>
+    <div class="map-legend">
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#3fb950"></div>
+        <span>מאומת</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#d29922"></div>
+        <span>ממתין לאימות</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- RECENT SIGHTINGS -->
+    <div class="panel">
+      <div class="panel-header">תצפיות אחרונות</div>
+      <ul class="sighting-list" id="recent-list">
+        <li class="sighting-item">
+          <div class="skeleton" style="width:70%; height:0.9em"></div>
+          <div class="skeleton" style="width:50%; height:0.65em; margin-top:4px"></div>
+        </li>
+        <li class="sighting-item">
+          <div class="skeleton" style="width:60%; height:0.9em"></div>
+          <div class="skeleton" style="width:45%; height:0.65em; margin-top:4px"></div>
+        </li>
+        <li class="sighting-item">
+          <div class="skeleton" style="width:75%; height:0.9em"></div>
+          <div class="skeleton" style="width:55%; height:0.65em; margin-top:4px"></div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- TOP SPECIES -->
+    <div class="panel">
+      <div class="panel-header">מינים נפוצים</div>
+      <div class="species-bar-list" id="top-species">
+        <div class="skeleton" style="height:2.5rem"></div>
+        <div class="skeleton" style="height:2.5rem; margin-top:4px"></div>
+        <div class="skeleton" style="height:2.5rem; margin-top:4px"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-text">
+      © 2026 Herp Israel · <a class="footer-link" href="mailto:aram.aviram@gmail.com">aram.aviram@gmail.com</a>
+    </div>
+    <div class="footer-text">
+      פותח עם Supabase · Leaflet · Vercel
+    </div>
+    <a class="footer-link footer-text" href="https://herp-israel-form.vercel.app">
+      → הגש תצפית חדשה
+    </a>
+  </div>
+</footer>
+
+<script>
+  // ── SUPABASE CONFIG ──────────────────────────────────────────
+  // Replace these with your actual values from your Supabase project
+  const SUPABASE_URL = 'https://qobayftqligpshmyweio.supabase.co';
+  const SUPABASE_ANON_KEY = 'YOUR_ANON_PUBLIC_KEY_HERE'; // Replace this!
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ── MAP INIT ─────────────────────────────────────────────────
+  const map = L.map('map', {
+    center: [31.5, 34.9],
+    zoom: 7,
+    zoomControl: true,
+    attributionControl: false
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd'
+  }).addTo(map);
+
+  L.control.attribution({ prefix: false }).addAttribution('© OpenStreetMap © CARTO').addTo(map);
+
+  function makeIcon(color) {
+    return L.divIcon({
+      className: '',
+      html: `<div style="
+        width:10px; height:10px;
+        background:${color};
+        border-radius:50%;
+        border:2px solid rgba(255,255,255,0.3);
+        box-shadow:0 0 6px ${color}88;
+      "></div>`,
+      iconSize: [10, 10],
+      iconAnchor: [5, 5]
+    });
+  }
+
+  // ── FORMAT DATE (Hebrew) ──────────────────────────────────────
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  // ── ANIMATE COUNTER ──────────────────────────────────────────
+  function animateCount(el, target) {
+    el.classList.remove('loading');
+    const duration = 1200;
+    const start = performance.now();
+    const from = 0;
+    function step(now) {
+      const t = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = Math.round(from + (target - from) * eased).toLocaleString('he-IL');
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ── LOAD DATA ────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      // Total
+      const { count: total } = await supabase.from('reports').select('*', { count: 'exact', head: true });
+      animateCount(document.getElementById('stat-total'), total || 0);
+
+      // Validated
+      const { count: validated } = await supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'Validated');
+      animateCount(document.getElementById('stat-validated'), validated || 0);
+
+      // Recent (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const { count: recent } = await supabase.from('reports').select('*', { count: 'exact', head: true }).gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+      animateCount(document.getElementById('stat-recent'), recent || 0);
+
+      // Species count
+      const { data: speciesData } = await supabase.from('species').select('id');
+      animateCount(document.getElementById('stat-species'), speciesData?.length || 0);
+
+    } catch (e) {
+      console.error('Stats error:', e);
+    }
+  }
+
+  async function loadMapAndRecent() {
+    try {
+      // Load validated sightings for map (with coordinates)
+      const { data: mapData } = await supabase
+        .from('reports')
+        .select('id, latitude, longitude, date, status, species:species_id(common_name, scientific_name)')
+        .in('status', ['Validated', 'Pending Review'])
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .limit(3000);
+
+      if (mapData) {
+        mapData.forEach(r => {
+          const color = r.status === 'Validated' ? '#3fb950' : '#d29922';
+          const icon = makeIcon(color);
+          const marker = L.marker([r.latitude, r.longitude], { icon }).addTo(map);
+          const species = r.species?.common_name || 'לא מזוהה';
+          const sci = r.species?.scientific_name || '';
+          marker.bindPopup(`
+            <div class="popup-species">${species}</div>
+            <div class="popup-sci">${sci}</div>
+            <div class="popup-meta">
+              📅 ${formatDate(r.date)}<br/>
+              📍 ${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)}
+            </div>
+          `);
+        });
+      }
+
+      // Load recent sightings for sidebar
+      const { data: recent } = await supabase
+        .from('reports')
+        .select('id, date, species:species_id(common_name, scientific_name), location_description, number_of_individuals')
+        .eq('status', 'Validated')
+        .order('date', { ascending: false })
+        .limit(8);
+
+      const list = document.getElementById('recent-list');
+      if (recent && recent.length > 0) {
+        list.innerHTML = recent.map((r, i) => `
+          <li class="sighting-item" style="animation-delay:${i * 0.06}s">
+            <div class="sighting-species">${r.species?.common_name || 'לא מזוהה'}</div>
+            <div class="sighting-sci">${r.species?.scientific_name || ''}</div>
+            <div class="sighting-meta">
+              <span>📅 ${formatDate(r.date)}</span>
+              ${r.number_of_individuals ? `<span>× ${r.number_of_individuals}</span>` : ''}
+              ${r.location_description ? `<span>📍 ${r.location_description.substring(0, 20)}${r.location_description.length > 20 ? '...' : ''}</span>` : ''}
+            </div>
+          </li>
+        `).join('');
+      } else {
+        list.innerHTML = '<li class="sighting-item" style="color:var(--muted)">אין נתונים זמינים</li>';
+      }
+
+    } catch (e) {
+      console.error('Map/recent error:', e);
+    }
+  }
+
+  async function loadTopSpecies() {
+    try {
+      const { data } = await supabase
+        .from('reports')
+        .select('species:species_id(common_name)')
+        .eq('status', 'Validated');
+
+      if (!data) return;
+
+      const counts = {};
+      data.forEach(r => {
+        const name = r.species?.common_name;
+        if (name) counts[name] = (counts[name] || 0) + 1;
+      });
+
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 7);
+      const max = sorted[0]?.[1] || 1;
+
+      const container = document.getElementById('top-species');
+      container.innerHTML = sorted.map(([name, count], i) => `
+        <div class="species-bar-item">
+          <div class="species-bar-top">
+            <span class="species-name">${name}</span>
+            <span class="species-count">${count.toLocaleString('he-IL')}</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" data-width="${(count / max * 100).toFixed(1)}%"></div>
+          </div>
+        </div>
+      `).join('');
+
+      // Animate bars after render
+      setTimeout(() => {
+        document.querySelectorAll('.bar-fill').forEach(bar => {
+          bar.style.width = bar.dataset.width;
+        });
+      }, 100);
+
+    } catch (e) {
+      console.error('Species error:', e);
+    }
+  }
+
+  // ── INIT ─────────────────────────────────────────────────────
+  loadStats();
+  loadMapAndRecent();
+  loadTopSpecies();
+</script>
+
+</body>
+</html>
