@@ -383,12 +383,12 @@ footer a:hover{text-decoration:underline}
 <!-- FOOTER -->
 <footer>
   <p>© 2026 זוחלים ודו-חיים בישראל &nbsp;·&nbsp;
-     <a href="mailto:aram.aviram@gmail.com">aram.aviram@gmail.com</a> &nbsp;·&nbsp;
+     <a href="/cdn-cgi/l/email-protection#214053404c0f40574853404c61464c40484d0f424e4c"><span class="__cf_email__" data-cfemail="78190a191556190e110a1915381f15191114561b1715">[email&#160;protected]</span></a> &nbsp;·&nbsp;
      <a href="https://herp-israel-form.vercel.app">הגש תצפית חדשה</a>
   </p>
 </footer>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── CONFIG ───────────────────────────────────────────────────
 const SUPABASE_URL = 'https://qobayftqligpshmyweio.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvYmF5ZnRxbGlncHNobXl3ZWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTEzMDcsImV4cCI6MjA4NzA4NzMwN30.u69AQLyyrXJvgBLTUO9ZpMvpd6dbqTDNj9Z_0RSctps';
@@ -404,28 +404,49 @@ function clearHeat() { heatLayers.forEach(l => map.removeLayer(l)); heatLayers =
 function drawHeatmap(data) {
   clearHeat();
   if (!data || !data.length) return;
-  const CELL = 0.09; // ~10km
+
+  // Aggregate into ~10km grid cells
+  const CELL = 0.09;
   const grid = {};
   data.forEach(r => {
     if (!r.latitude || !r.longitude) return;
     const key = `${Math.floor(r.longitude/CELL)},${Math.floor(r.latitude/CELL)}`;
     grid[key] = (grid[key] || 0) + 1;
   });
+
   const max = Math.max(...Object.values(grid));
+
+  // Render each cell as a large semi-transparent circle — overlapping circles
+  // create a natural "blob" appearance that looks like a distribution area
   Object.entries(grid).forEach(([key, count]) => {
     const [gx, gy] = key.split(',').map(Number);
+    // Center of the cell
+    const lat = (gy + 0.5) * CELL;
+    const lng = (gx + 0.5) * CELL;
     const t = count / max;
-    // Warm amber→brown palette, no reds
-    const r = Math.round(180 + t * 60);
-    const g = Math.round(120 - t * 70);
-    const b = Math.round(20);
-    const alpha = 0.18 + t * 0.65;
-    const rect = L.rectangle(
-      [[gy*CELL, gx*CELL], [(gy+1)*CELL, (gx+1)*CELL]],
-      {color:`rgba(${r},${g},${b},0.7)`, weight:0.5, fillColor:`rgba(${r},${g},${b},${alpha})`, fillOpacity:1}
-    ).addTo(map);
-    rect.bindPopup(`<b>${count} תצפיות מאומתות</b> באזור זה`);
-    heatLayers.push(rect);
+
+    // Warm amber palette — low=yellow-amber, high=deep brown
+    const rc = Math.round(210 - t * 30);
+    const gc = Math.round(130 - t * 90);
+    const bc = Math.round(20);
+    const fillAlpha = 0.13 + t * 0.45;
+    const strokeAlpha = 0.05 + t * 0.25;
+
+    // Radius scales with density — denser cells spread slightly wider
+    // ~12km base radius so circles overlap and merge visually
+    const radiusM = 12000 + t * 4000;
+
+    const circle = L.circle([lat, lng], {
+      radius: radiusM,
+      color: `rgba(${rc},${gc},${bc},${strokeAlpha})`,
+      weight: 0,
+      fillColor: `rgba(${rc},${gc},${bc},${fillAlpha})`,
+      fillOpacity: 1,
+      interactive: true
+    }).addTo(map);
+
+    circle.bindPopup(`<b>${count} תצפיות מאומתות</b> באזור זה`);
+    heatLayers.push(circle);
   });
 }
 
@@ -455,12 +476,13 @@ async function loadInfoBoxes() {
   animCount('ib-valid', valid || 0);
   animCount('ib-species', sp?.length || 0);
 
-  // Last week species
+  // Last week species — recent so unlikely to exceed 1000 but add limit safety
   const w = new Date(); w.setDate(w.getDate() - 7);
   const {data: wData} = await sb.from('reports')
     .select('species:species_id(common_name)')
     .eq('status','Validated')
-    .gte('date', w.toISOString().split('T')[0]);
+    .gte('date', w.toISOString().split('T')[0])
+    .limit(2000);
   const weekSpecies = [...new Set((wData||[]).map(r => r.species?.common_name).filter(Boolean))];
   const weekEl = document.getElementById('ib-week');
   if (weekSpecies.length === 0) {
@@ -537,9 +559,11 @@ async function loadRecent() {
 const MONTHS_HE = ['ינו׳','פבר׳','מרץ','אפר׳','מאי','יוני','יולי','אוג׳','ספט׳','אוק׳','נוב׳','דצמ׳'];
 
 async function loadSeasonal() {
-  const {data} = await sb.from('reports').select('date').eq('status','Validated');
+  const data = await fetchAll(
+    sb.from('reports').select('date').eq('status','Validated')
+  );
   document.getElementById('seasonal-loading').style.display = 'none';
-  if (!data || !data.length) return;
+  if (!data.length) return;
 
   const counts = new Array(12).fill(0);
   data.forEach(r => { if (r.date) counts[new Date(r.date).getMonth()]++; });
@@ -569,10 +593,26 @@ async function loadSeasonal() {
   svg.innerHTML = html;
 }
 
+// ── PAGINATION HELPER ─────────────────────────────────────────
+async function fetchAll(query) {
+  const PAGE = 1000;
+  let all = [], from = 0, done = false;
+  while (!done) {
+    const { data, error } = await query.range(from, from + PAGE - 1);
+    if (error || !data || data.length === 0) { done = true; break; }
+    all = all.concat(data);
+    if (data.length < PAGE) done = true;
+    else from += PAGE;
+  }
+  return all;
+}
+
 // ── TOP SPECIES ───────────────────────────────────────────────
 async function loadTopSpecies() {
-  const {data} = await sb.from('reports').select('species:species_id(common_name)').eq('status','Validated');
-  if (!data) return;
+  const data = await fetchAll(
+    sb.from('reports').select('species:species_id(common_name)').eq('status','Validated')
+  );
+  if (!data.length) return;
   const counts = {};
   data.forEach(r => { const n = r.species?.common_name; if (n) counts[n] = (counts[n]||0)+1; });
   const top = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0,10);
@@ -614,10 +654,10 @@ const FAMILY_GROUPS = {
 };
 
 async function loadFamilyBreakdown() {
-  const {data} = await sb.from('reports')
-    .select('species:species_id(family)')
-    .eq('status','Validated');
-  if (!data) return;
+  const data = await fetchAll(
+    sb.from('reports').select('species:species_id(family)').eq('status','Validated')
+  );
+  if (!data.length) return;
 
   const raw = {};
   data.forEach(r => { const f = r.species?.family; if (f) raw[f] = (raw[f]||0)+1; });
@@ -653,13 +693,4 @@ async function loadFamilyBreakdown() {
   }, 100);
 }
 
-// ── INIT ─────────────────────────────────────────────────────
-loadInfoBoxes();
-loadSpeciesDropdown();
-loadRecent();
-loadSeasonal();
-loadTopSpecies();
-loadFamilyBreakdown();
-</script>
-</body>
-</html>
+// ── INIT ──────────────── 
