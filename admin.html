@@ -894,8 +894,11 @@
     <div id="reportModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>פרטי דיווח</h2>
-                <button class="close-btn" id="closeModal">&times;</button>
+                <h2 id="modalTitle">פרטי דיווח</h2>
+                <div style="display:flex;gap:10px;">
+                    <button class="btn btn-primary" id="editReportBtn" onclick="toggleEditMode()" style="display:none;">✏️ ערוך דיווח</button>
+                    <button class="close-btn" id="closeModal">&times;</button>
+                </div>
             </div>
             <div class="modal-body">
                 <div id="modalContent"></div>
@@ -904,6 +907,9 @@
     </div>
     
     <script>
+        // ⚠️ TEST MODE - Set to false when ready for production
+        const TEST_MODE = true;
+        
         // Supabase Configuration
         const SUPABASE_URL = 'https://qobayftqligpshmyweio.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvYmF5ZnRxbGlncHNobXl3ZWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTEzMDcsImV4cCI6MjA4NzA4NzMwN30.u69AQLyyrXJvgBLTUO9ZpMvpd6dbqTDNj9Z_0RSctps';
@@ -921,6 +927,11 @@
         let selectedArea = null;
         let filteredReports = [];
         let uniqueFamilies = [];
+        
+        // Edit mode variables
+        let editMode = false;
+        let editMap = null;
+        let editMarker = null;
         
         // Pagination variables
         let currentPage = 1;
@@ -1366,8 +1377,25 @@
                 if (!report) return;
                 
                 currentReport = report;
+                editMode = false;
                 
-                const modalContent = document.getElementById('modalContent');
+                renderReportView();
+                
+                // Show edit button
+                document.getElementById('editReportBtn').style.display = 'block';
+                document.getElementById('reportModal').classList.add('active');
+            } catch (error) {
+                console.error('Error viewing report:', error);
+            }
+        }
+        
+        // Render report in view or edit mode
+        function renderReportView() {
+            const report = currentReport;
+            const modalContent = document.getElementById('modalContent');
+            
+            if (!editMode) {
+                // VIEW MODE
                 modalContent.innerHTML = `
                     <div class="detail-grid">
                         <div class="detail-item">
@@ -1493,9 +1521,97 @@
                     document.getElementById('speciesEditForm').style.display = 'block';
                 });
                 
-                document.getElementById('reportModal').classList.add('active');
-            } catch (error) {
-                console.error('Error viewing report:', error);
+            } else {
+                // EDIT MODE
+                modalContent.innerHTML = `
+                    ${TEST_MODE ? '<div style="background:#fff3cd;color:#856404;padding:15px;border-radius:8px;margin-bottom:20px;"><strong>⚠️ מצב בדיקה:</strong> שינויים לא יישמרו בפועל</div>' : ''}
+                    
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <div class="detail-label">תאריך *</div>
+                            <input type="date" id="edit_date" value="${report.date}" style="width:100%;padding:10px;border-radius:6px;border:2px solid #e0e0e0;">
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">שעה</div>
+                            <input type="time" id="edit_time" value="${report.time || ''}" style="width:100%;padding:10px;border-radius:6px;border:2px solid #e0e0e0;">
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">שם מדווח *</div>
+                            <input type="text" id="edit_name" value="${report.full_name}" style="width:100%;padding:10px;border-radius:6px;border:2px solid #e0e0e0;">
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">מין *</div>
+                            <select id="edit_species" style="width:100%;padding:10px;border-radius:6px;border:2px solid #e0e0e0;">
+                                ${allSpecies.map(s => `
+                                    <option value="${s.id}" ${s.id === report.species_id ? 'selected' : ''}>
+                                        ${s.common_name}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">כמות *</div>
+                            <input type="text" id="edit_quantity" value="${report.number_of_individuals}" style="width:100%;padding:10px;border-radius:6px;border:2px solid #e0e0e0;">
+                        </div>
+                        
+                        <div class="detail-item" style="grid-column:1/-1;">
+                            <div class="detail-label">📍 מיקום (לחץ על המפה או הקלד)</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                                <div>
+                                    <label style="font-size:12px;color:#666;">קו רוחב</label>
+                                    <input type="number" id="edit_lat" step="0.000001" value="${report.latitude || ''}" 
+                                           style="width:100%;padding:8px;border-radius:6px;border:2px solid #e0e0e0;"
+                                           onchange="updateEditMapFromCoords()">
+                                </div>
+                                <div>
+                                    <label style="font-size:12px;color:#666;">קו אורך</label>
+                                    <input type="number" id="edit_lng" step="0.000001" value="${report.longitude || ''}" 
+                                           style="width:100%;padding:8px;border-radius:6px;border:2px solid #e0e0e0;"
+                                           onchange="updateEditMapFromCoords()">
+                                </div>
+                            </div>
+                            <div id="editMapContainer" style="height:300px;border-radius:8px;border:2px solid #667eea;"></div>
+                        </div>
+                        
+                        <div class="detail-item" style="grid-column:1/-1;">
+                            <div class="detail-label">תיאור מיקום</div>
+                            <input type="text" id="edit_location_desc" value="${report.location_description || ''}" 
+                                   style="width:100%;padding:10px;border-radius:6px;border:2px solid #e0e0e0;">
+                        </div>
+                        
+                        <div class="detail-item" style="grid-column:1/-1;">
+                            <div class="detail-label">פרטי תצפית</div>
+                            <textarea id="edit_details" style="width:100%;padding:10px;border-radius:6px;border:2px solid #e0e0e0;min-height:80px;">${report.sighting_details || ''}</textarea>
+                        </div>
+                        
+                        <div class="detail-item" style="grid-column:1/-1;">
+                            <div class="detail-label">הערות נוספות</div>
+                            <textarea id="edit_comments" style="width:100%;padding:10px;border-radius:6px;border:2px solid #e0e0e0;min-height:60px;">${report.additional_comments || ''}</textarea>
+                        </div>
+                        
+                        <div class="detail-item" style="grid-column:1/-1;">
+                            <div class="detail-label">פרטי קשר</div>
+                            <input type="text" id="edit_contact" value="${report.contact_details || ''}" 
+                                   style="width:100%;padding:10px;border-radius:6px;border:2px solid #e0e0e0;">
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top:20px;padding:15px;background:#f8f9fa;border-radius:8px;">
+                        <p style="margin:0;color:#666;font-size:14px;">ℹ️ <strong>שים לב:</strong> סטטוס האימות והערות האימות לא ישתנו. השתמש בכפתורי האימות למטה לשינוי סטטוס.</p>
+                    </div>
+                    
+                    <div style="display:flex;gap:10px;margin-top:20px;">
+                        <button class="btn btn-primary" onclick="saveReportEdit()" style="flex:1;">💾 שמור שינויים</button>
+                        <button class="btn btn-secondary" onclick="cancelEdit()" style="flex:1;">❌ ביטול</button>
+                    </div>
+                `;
+                
+                // Initialize edit map
+                setTimeout(() => initEditMap(), 100);
             }
         }
         
@@ -1551,6 +1667,134 @@
                 showError('שגיאה בעדכון הדיווח');
             }
         };
+        
+        // ==================== EDIT MODE FUNCTIONS ====================
+        
+        // Toggle Edit Mode
+        window.toggleEditMode = function() {
+            editMode = !editMode;
+            const editBtn = document.getElementById('editReportBtn');
+            const modalTitle = document.getElementById('modalTitle');
+            
+            if (editMode) {
+                editBtn.textContent = '👁️ צפייה';
+                modalTitle.textContent = 'עריכת דיווח';
+            } else {
+                editBtn.textContent = '✏️ ערוך דיווח';
+                modalTitle.textContent = 'פרטי דיווח';
+            }
+            
+            renderReportView();
+        };
+        
+        // Initialize Edit Map
+        function initEditMap() {
+            const container = document.getElementById('editMapContainer');
+            if (!container) return;
+            
+            // Clean up existing map
+            if (editMap) {
+                editMap.remove();
+                editMap = null;
+            }
+            
+            const lat = parseFloat(document.getElementById('edit_lat').value) || 31.5;
+            const lng = parseFloat(document.getElementById('edit_lng').value) || 34.8;
+            
+            editMap = L.map('editMapContainer').setView([lat, lng], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(editMap);
+            
+            // Add marker
+            editMarker = L.marker([lat, lng]).addTo(editMap);
+            
+            // Click to update location
+            editMap.on('click', (e) => {
+                const newLat = e.latlng.lat;
+                const newLng = e.latlng.lng;
+                
+                editMarker.setLatLng([newLat, newLng]);
+                document.getElementById('edit_lat').value = newLat.toFixed(8);
+                document.getElementById('edit_lng').value = newLng.toFixed(8);
+            });
+        }
+        
+        // Update map from coordinates input
+        window.updateEditMapFromCoords = function() {
+            const lat = parseFloat(document.getElementById('edit_lat').value);
+            const lng = parseFloat(document.getElementById('edit_lng').value);
+            
+            if (editMap && !isNaN(lat) && !isNaN(lng)) {
+                editMap.setView([lat, lng], 13);
+                editMarker.setLatLng([lat, lng]);
+            }
+        };
+        
+        // Cancel Edit
+        window.cancelEdit = function() {
+            if (confirm('האם לבטל את השינויים?')) {
+                toggleEditMode();
+            }
+        };
+        
+        // Save Report Edit
+        window.saveReportEdit = async function() {
+            try {
+                const editedData = {
+                    date: document.getElementById('edit_date').value,
+                    time: document.getElementById('edit_time').value || null,
+                    full_name: document.getElementById('edit_name').value.trim(),
+                    species_id: parseInt(document.getElementById('edit_species').value),
+                    number_of_individuals: document.getElementById('edit_quantity').value,
+                    latitude: parseFloat(document.getElementById('edit_lat').value) || null,
+                    longitude: parseFloat(document.getElementById('edit_lng').value) || null,
+                    location_description: document.getElementById('edit_location_desc').value,
+                    sighting_details: document.getElementById('edit_details').value,
+                    additional_comments: document.getElementById('edit_comments').value,
+                    contact_details: document.getElementById('edit_contact').value,
+                    updated_at: new Date().toISOString(),
+                    updated_by: currentUser.email
+                };
+                
+                if (!editedData.full_name) {
+                    showError('שם מדווח הוא שדה חובה');
+                    return;
+                }
+                if (!editedData.date) {
+                    showError('תאריך הוא שדה חובה');
+                    return;
+                }
+                
+                if (!confirm('האם לשמור את השינויים?')) {
+                    return;
+                }
+                
+                if (TEST_MODE) {
+                    console.log('🧪 TEST MODE - Would save:', editedData);
+                    alert('מצב בדיקה: השינויים לא נשמרו בפועל.\n\nכדי לשמור בפועל, שנה TEST_MODE ל-false בקוד.');
+                    showSuccess('מצב בדיקה: הצגת השינויים בקונסול (TEST_MODE = true)');
+                    return;
+                }
+                
+                const { error } = await supabaseClient
+                    .from('reports')
+                    .update(editedData)
+                    .eq('id', currentReport.id);
+                
+                if (error) throw error;
+                
+                showSuccess('הדיווח עודכן בהצלחה');
+                await loadReports();
+                document.getElementById('closeModal').click();
+            } catch (error) {
+                console.error('Error saving report edit:', error);
+                showError('שגיאה בשמירת השינויים');
+            }
+        };
+        
+        // ==================== END EDIT MODE ====================
         
         // Close Modal
         document.getElementById('closeModal').addEventListener('click', () => {
@@ -1609,7 +1853,6 @@
                                 family
                             )
                         `)
-                        .neq('status', 'Rejected')
                         .order('created_at', { ascending: false })
                         .range(from, to);
                     
@@ -1650,7 +1893,6 @@
                             family
                         )
                     `)
-                    .neq('status', 'Rejected')
                     .order('created_at', { ascending: false });
                 
                 // Apply same filters as current view
