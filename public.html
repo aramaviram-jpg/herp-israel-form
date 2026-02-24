@@ -405,7 +405,6 @@ function drawHeatmap(data) {
   clearHeat();
   if (!data || !data.length) return;
 
-  // Aggregate into ~10km grid cells
   const CELL = 0.09;
   const grid = {};
   data.forEach(r => {
@@ -416,37 +415,28 @@ function drawHeatmap(data) {
 
   const max = Math.max(...Object.values(grid));
 
-  // Render each cell as a large semi-transparent circle — overlapping circles
-  // create a natural "blob" appearance that looks like a distribution area
   Object.entries(grid).forEach(([key, count]) => {
     const [gx, gy] = key.split(',').map(Number);
-    // Center of the cell
-    const lat = (gy + 0.5) * CELL;
-    const lng = (gx + 0.5) * CELL;
+    const lat = gy * CELL;
+    const lng = gx * CELL;
     const t = count / max;
 
-    // Warm amber palette — low=yellow-amber, high=deep brown
     const rc = Math.round(210 - t * 30);
     const gc = Math.round(130 - t * 90);
-    const bc = Math.round(20);
-    const fillAlpha = 0.13 + t * 0.45;
-    const strokeAlpha = 0.05 + t * 0.25;
+    const bc = 20;
+    const fillAlpha = 0.2 + t * 0.6;
 
-    // Radius scales with density — denser cells spread slightly wider
-    // ~12km base radius so circles overlap and merge visually
-    const radiusM = 12000 + t * 4000;
-
-    const circle = L.circle([lat, lng], {
-      radius: radiusM,
-      color: `rgba(${rc},${gc},${bc},${strokeAlpha})`,
-      weight: 0,
+    const bounds = [[lat, lng], [lat + CELL, lng + CELL]];
+    const rect = L.rectangle(bounds, {
+      color: `rgba(${rc},${gc},${bc},0.4)`,
+      weight: 1,
       fillColor: `rgba(${rc},${gc},${bc},${fillAlpha})`,
       fillOpacity: 1,
       interactive: true
     }).addTo(map);
 
-    circle.bindPopup(`<b>${count} תצפיות מאומתות</b> באזור זה`);
-    heatLayers.push(circle);
+    rect.bindPopup(`<b>${count} תצפיות מאומתות</b> באזור זה`);
+    heatLayers.push(rect);
   });
 }
 
