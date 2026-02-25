@@ -478,29 +478,75 @@ async function loadInfoBoxes() {
 }
 
 // ── SPECIES DROPDOWN ─────────────────────────────────────────
+// nameToIds maps common_name -> [id, id, ...] to aggregate subspecies on the map
+const nameToIds = {};
+
 async function loadSpeciesDropdown() {
   const {data} = await sb.from('species').select('id,common_name,scientific_name').order('common_name');
   const sel = document.getElementById('species-select');
-  if (data) data.forEach(s => {
-    const o = document.createElement('option');
-    o.value = s.id;
-    o.dataset.sci = s.scientific_name || '';
-    o.dataset.he  = s.common_name || '';
-    o.textContent  = s.common_name + (s.scientific_name ? ` — ${s.scientific_name}` : '');
-    sel.appendChild(o);
+  if (!data) return;
+
+  // Deduplicate by common_name; collect all IDs per name
+  const seen = {};
+  data.forEach(s => {
+    const name = s.common_name || 'לא ידוע';
+    if (!nameToIds[name]) nameToIds[name] = [];
+    nameToIds[name].push(s.id);
+    if (!seen[name]) {
+      seen[name] = true;
+      const o = document.createElement('option');
+      o.value = name;
+      o.dataset.sci = s.scientific_name || '';
+      o.dataset.he  = name;
+      o.textContent  = name + (s.scientific_name ? ` — ${s.scientific_name}` : '');
+      sel.appendChild(o);
+    }
   });
   sel.addEventListener('change', onSpeciesChange);
 }
 
 async function onSpeciesChange() {
-  const sel = document.getElementById('species-select');
-  const id  = sel.value;
-  const opt = sel.options[sel.selectedIndex];
-  if (!id) { clearHeat(); renderSpeciesCard(null); return; }
-  const {data} = await sb.from('public_heatmap_grid').select('grid_x,grid_y,count').eq('species_id', id);
-  drawHeatmap(data || []);
-  const totalCount = (data || []).reduce((s, r) => s + r.count, 0);
+  const sel  = document.getElementById('species-select');
+  const name = sel.value;
+  const opt  = sel.options[sel.selectedIndex];
+  if (!name) { loadAllSpeciesHeatmap(); renderSpeciesCard(null); return; }
+
+  const ids = nameToIds[name] || [];
+  const {data} = await sb.from('public_heatmap_grid')
+    .select('grid_x,grid_y,count')
+    .in('species_id', ids);
+
+  // Merge grid cells (subspecies may share same grid square)
+  const merged = {};
+  (data || []).forEach(r => {
+    const key = `${r.grid_x},${r.grid_y}`;
+    merged[key] = (merged[key] || 0) + r.count;
+  });
+  const mergedData = Object.entries(merged).map(([k, count]) => {
+    const [grid_x, grid_y] = k.split(',').map(Number);
+    return { grid_x, grid_y, count };
+  });
+
+  drawHeatmap(mergedData);
+  const totalCount = mergedData.reduce((s, r) => s + r.count, 0);
   renderSpeciesCard(opt.dataset.he, opt.dataset.sci, totalCount);
+}
+
+// ── INITIAL FULL HEATMAP ──────────────────────────────────────
+async function loadAllSpeciesHeatmap() {
+  const data = await fetchAll(
+    sb.from('public_heatmap_grid').select('grid_x,grid_y,count')
+  );
+  const merged = {};
+  data.forEach(r => {
+    const key = `${r.grid_x},${r.grid_y}`;
+    merged[key] = (merged[key] || 0) + r.count;
+  });
+  const mergedData = Object.entries(merged).map(([k, count]) => {
+    const [grid_x, grid_y] = k.split(',').map(Number);
+    return { grid_x, grid_y, count };
+  });
+  drawHeatmap(mergedData);
 }
 
 function renderSpeciesCard(he, sci, count) {
@@ -679,6 +725,7 @@ loadRecent();
 loadSeasonal();
 loadTopSpecies();
 loadFamilyBreakdown();
+loadAllSpeciesHeatmap();
 </script>
 </body>
 </html>
