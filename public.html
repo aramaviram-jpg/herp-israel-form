@@ -422,7 +422,7 @@ async function loadDistribution(scientificName) {
 
   if (!geojsonCache) {
     try {
-      const res = await fetch('/distributions/herp.geojson');
+      const res = await fetch('/herp.geojson');
       console.log('[distribution] fetch status:', res.status, res.ok);
       if (!res.ok) return;
       geojsonCache = await res.json();
@@ -435,7 +435,7 @@ async function loadDistribution(scientificName) {
   if (!feature) return;
 
   distributionLayer = L.geoJSON(feature, {
-    style: { color: '#1a5c8a', weight: 2, fillColor: '#2a8abf', fillOpacity: 0.20 }
+    style: { color: '#2a6a3a', weight: 1, fillColor: '#4aaa5a', fillOpacity: 0.25 }
   }).addTo(map);
   distributionLayer.bringToBack();
 }
