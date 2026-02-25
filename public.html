@@ -386,6 +386,10 @@ footer a:hover{text-decoration:underline}
      <a href="/cdn-cgi/l/email-protection#214053404c0f40574853404c61464c40484d0f424e4c"><span class="__cf_email__" data-cfemail="78190a191556190e110a1915381f15191114561b1715">[email&#160;protected]</span></a> &nbsp;·&nbsp;
      <a href="https://herp-israel-form.vercel.app">הגש תצפית חדשה</a>
   </p>
+  <p style="font-size:0.75rem;opacity:0.7;margin-top:0.3rem;">
+    מפות תפוצת זוחלים באדיבות יוזמת <a href="https://www.gardinitiative.org" target="_blank">Global Assessment of Reptile Distributions</a>. &nbsp;·&nbsp;
+    מפות דו-חיים באדיבות <a href="https://www.iucnredlist.org" target="_blank">איגוד שימור הטבע העולמי (IUCN)</a>.
+  </p>
 </footer>
 
 <script>
@@ -400,6 +404,38 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {m
 
 let heatLayers = [];
 function clearHeat() { heatLayers.forEach(l => map.removeLayer(l)); heatLayers = []; }
+
+// ── DISTRIBUTION LAYER ───────────────────────────────────────
+let distributionLayer = null;
+let geojsonCache = null; // loaded once, reused
+
+function clearDistribution() {
+  if (distributionLayer) { map.removeLayer(distributionLayer); distributionLayer = null; }
+}
+
+async function loadDistribution(scientificName) {
+  clearDistribution();
+  if (!scientificName) return;
+
+  // Normalize: take first two words (genus + species), drop subspecies
+  const binomial = scientificName.trim().split(/\s+/).slice(0, 2).join(' ');
+
+  // Load file once and cache
+  if (!geojsonCache) {
+    try {
+      const res = await fetch('/distributions/herp.geojson');
+      if (!res.ok) return;
+      geojsonCache = await res.json();
+    } catch (e) { return; }
+  }
+
+  const feature = geojsonCache.features.find(f => f.properties.binomial === binomial);
+  if (!feature) return; // silent — no distribution data for this species
+
+  distributionLayer = L.geoJSON(feature, {
+    style: { color: '#2a6a3a', weight: 1, fillColor: '#4aaa5a', fillOpacity: 0.25 }
+  }).addTo(map);
+}
 
 function drawHeatmap(data) {
   clearHeat();
@@ -523,7 +559,7 @@ async function onSpeciesChange() {
   const sel  = document.getElementById('species-select');
   const name = sel.value;
   const opt  = sel.options[sel.selectedIndex];
-  if (!name) { loadAllSpeciesHeatmap(); renderSpeciesCard(null); return; }
+  if (!name) { loadAllSpeciesHeatmap(); clearDistribution(); renderSpeciesCard(null); return; }
 
   const ids = nameToIds[name] || [];
   const {data} = await sb.from('public_heatmap_grid')
@@ -542,6 +578,7 @@ async function onSpeciesChange() {
   });
 
   drawHeatmap(mergedData);
+  await loadDistribution(opt.dataset.sci);
   const totalCount = mergedData.reduce((s, r) => s + r.count, 0);
   renderSpeciesCard(opt.dataset.he, opt.dataset.sci, totalCount);
 }
