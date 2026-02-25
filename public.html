@@ -499,11 +499,6 @@ async function onSpeciesChange() {
   if (!id) { clearHeat(); renderSpeciesCard(null); return; }
   const {data} = await sb.from('public_heatmap_grid').select('grid_x,grid_y,count').eq('species_id', id);
   drawHeatmap(data || []);
-  if (data && data.length) {
-    const CELL = 0.09;
-    const pts = data.map(r => [r.grid_y * CELL + CELL/2, r.grid_x * CELL + CELL/2]);
-    if (pts.length) { const b = L.latLngBounds(pts); if (b.isValid()) map.fitBounds(b, {padding:[40,40]}); }
-  }
   const totalCount = (data || []).reduce((s, r) => s + r.count, 0);
   renderSpeciesCard(opt.dataset.he, opt.dataset.sci, totalCount);
 }
