@@ -433,8 +433,9 @@ async function loadDistribution(scientificName) {
   if (!feature) return; // silent — no distribution data for this species
 
   distributionLayer = L.geoJSON(feature, {
-    style: { color: '#2a6a3a', weight: 1, fillColor: '#4aaa5a', fillOpacity: 0.25 }
+    style: { color: '#1a5c8a', weight: 2, fillColor: '#2a8abf', fillOpacity: 0.20 }
   }).addTo(map);
+  distributionLayer.bringToBack();
 }
 
 function drawHeatmap(data) {
@@ -577,8 +578,8 @@ async function onSpeciesChange() {
     return { grid_x, grid_y, count };
   });
 
-  drawHeatmap(mergedData);
   await loadDistribution(opt.dataset.sci);
+  drawHeatmap(mergedData);
   const totalCount = mergedData.reduce((s, r) => s + r.count, 0);
   renderSpeciesCard(opt.dataset.he, opt.dataset.sci, totalCount);
 }
