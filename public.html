@@ -417,20 +417,22 @@ async function loadDistribution(scientificName) {
   clearDistribution();
   if (!scientificName) return;
 
-  // Normalize: take first two words (genus + species), drop subspecies
   const binomial = scientificName.trim().split(/\s+/).slice(0, 2).join(' ');
+  console.log('[distribution] looking for:', binomial);
 
-  // Load file once and cache
   if (!geojsonCache) {
     try {
       const res = await fetch('/distributions/herp.geojson');
+      console.log('[distribution] fetch status:', res.status, res.ok);
       if (!res.ok) return;
       geojsonCache = await res.json();
-    } catch (e) { return; }
+      console.log('[distribution] loaded features:', geojsonCache.features.length);
+    } catch (e) { console.error('[distribution] fetch error:', e); return; }
   }
 
   const feature = geojsonCache.features.find(f => f.properties.binomial === binomial);
-  if (!feature) return; // silent — no distribution data for this species
+  console.log('[distribution] feature found:', !!feature);
+  if (!feature) return;
 
   distributionLayer = L.geoJSON(feature, {
     style: { color: '#1a5c8a', weight: 2, fillColor: '#2a8abf', fillOpacity: 0.20 }
