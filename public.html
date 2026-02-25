@@ -455,10 +455,24 @@ function formatDate(d) {
 async function loadInfoBoxes() {
   const {count: total} = await sb.from('public_reports_safe').select('*', {count:'exact', head:true});
   const {count: valid} = await sb.from('public_reports_safe').select('*', {count:'exact', head:true});
-  const {data: sp} = await sb.from('species').select('id');
+  // Distinct species actually reported (from validated reports)
+  const {data: repSp} = await sb.from('public_reports_safe').select('species:species_id(common_name)');
+  const reportedSpecies = new Set((repSp||[]).map(r => r.species?.common_name).filter(Boolean));
+
+  // Total known species in Israel (distinct common names in species table)
+  const {data: allSp} = await sb.from('species').select('common_name');
+  const totalSpecies = new Set((allSp||[]).map(s => s.common_name).filter(Boolean));
+
   animCount('ib-total', total || 0);
   animCount('ib-valid', total || 0);
-  animCount('ib-species', sp?.length || 0);
+  animCount('ib-species', reportedSpecies.size);
+
+  // Update the "מתוך X" label dynamically
+  document.querySelectorAll('.ibox-sub').forEach(el => {
+    if (el.textContent.includes('מינים בישראל')) {
+      el.textContent = `מתוך ${totalSpecies.size} מינים בישראל`;
+    }
+  });
 
   // Last week species — recent so unlikely to exceed 1000 but add limit safety
   const w = new Date(); w.setDate(w.getDate() - 7);
