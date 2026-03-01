@@ -176,9 +176,27 @@ header{
 
 /* Species card */
 .sp-placeholder{color:var(--muted);font-size:0.85rem;line-height:1.7}
+.sp-photo{width:100%;height:190px;overflow:hidden;border-radius:6px;margin-bottom:0.85rem;background:var(--bg3);position:relative}
+.sp-photo img{width:100%;height:100%;object-fit:cover}
 .sp-name-he{font-size:1.25rem;font-weight:700;color:var(--text);margin-bottom:0.15rem}
-.sp-name-sci{font-style:italic;font-size:0.78rem;color:var(--amber);margin-bottom:0.85rem}
-.sp-desc{font-size:0.83rem;color:var(--muted);line-height:1.7;margin-bottom:1rem}
+.sp-name-sci{font-style:italic;font-size:0.78rem;color:var(--amber);margin-bottom:0.7rem}
+.sp-badges{display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.8rem}
+.sp-badge{display:inline-flex;align-items:center;gap:0.28rem;padding:0.22rem 0.55rem;border-radius:5px;font-size:0.72rem;font-weight:500;border:1px solid var(--border);background:var(--bg2);color:var(--stone)}
+.sp-badge-venomous{border-color:#e08080;background:#fdf0f0;color:#902020}
+.sp-badge-subvenomous{border-color:#e0b860;background:#fdf8e8;color:#7a4a10}
+.sp-badge-nonvenomous{border-color:#80c080;background:#f0fdf0;color:#206020}
+.sp-badge-day{border-color:#e8c870;background:#fdf8e8;color:#7a5a10}
+.sp-badge-night{border-color:#a0a8d0;background:#f0f0f8;color:#383870}
+.sp-badge-both{border-color:#c8b880;background:#faf4e4;color:#5a4a18}
+.sp-badge svg{width:13px;height:13px;flex-shrink:0}
+.sp-cons{position:absolute;bottom:0.5rem;left:0.5rem;padding:0.18rem 0.55rem;border-radius:4px;font-size:0.68rem;font-weight:700;letter-spacing:0.04em}
+.sp-cons-lc{background:rgba(40,110,40,0.85);color:#fff}
+.sp-cons-en{background:rgba(180,40,40,0.85);color:#fff}
+.sp-cons-vu{background:rgba(180,110,10,0.85);color:#fff}
+.sp-cons-nt{background:rgba(60,100,160,0.85);color:#fff}
+.sp-cons-cr{background:rgba(140,20,20,0.85);color:#fff}
+.sp-diet{font-size:0.78rem;color:var(--muted);margin-bottom:0.55rem}
+.sp-desc{font-size:0.8rem;color:var(--stone);line-height:1.65;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:0.55rem 0.7rem;margin-bottom:0.8rem}
 .sp-stats{display:grid;grid-template-columns:1fr 1fr;gap:0.65rem}
 .sp-stat{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:0.65rem;text-align:center}
 .sp-stat-n{font-size:1.3rem;font-weight:700;color:var(--amber)}
@@ -535,7 +553,7 @@ async function loadInfoBoxes() {
 const nameToIds = {};
 
 async function loadSpeciesDropdown() {
-  const {data} = await sb.from('species').select('id,common_name,scientific_name').order('common_name');
+  const {data} = await sb.from('species').select('id,common_name,scientific_name,venom_level,activity_time,max_size_mm,diet,description,photo_url,red_list_status').order('common_name');
   const sel = document.getElementById('species-select');
   if (!data) return;
 
@@ -549,20 +567,29 @@ async function loadSpeciesDropdown() {
       seen[name] = true;
       const o = document.createElement('option');
       o.value = name;
-      o.dataset.sci = s.scientific_name || '';
-      o.dataset.he  = name;
-      o.textContent  = name + (s.scientific_name ? ` — ${s.scientific_name}` : '');
+      o.dataset.sci    = s.scientific_name || '';
+      o.dataset.he     = name;
+      o.dataset.venom  = s.venom_level     || '';
+      o.dataset.active = s.activity_time   || '';
+      o.dataset.size   = s.max_size_mm     || '';
+      o.dataset.diet   = s.diet            || '';
+      o.dataset.desc   = s.description     || '';
+      o.dataset.photo  = s.photo_url       || '';
+      o.dataset.cons   = s.red_list_status || '';
+      o.textContent    = name + (s.scientific_name ? ` — ${s.scientific_name}` : '');
       sel.appendChild(o);
     }
   });
   sel.addEventListener('change', onSpeciesChange);
 }
 
+let mergedGridCache = {};
+
 async function onSpeciesChange() {
   const sel  = document.getElementById('species-select');
   const name = sel.value;
   const opt  = sel.options[sel.selectedIndex];
-  if (!name) { loadAllSpeciesHeatmap(); clearDistribution(); renderSpeciesCard(null); return; }
+  if (!name) { loadAllSpeciesHeatmap(); clearDistribution(); renderSpeciesCard(null, 0); return; }
 
   const ids = nameToIds[name] || [];
   const {data} = await sb.from('public_heatmap_grid')
@@ -580,10 +607,11 @@ async function onSpeciesChange() {
     return { grid_x, grid_y, count };
   });
 
+  mergedGridCache = merged;
   await loadDistribution(opt.dataset.sci);
   drawHeatmap(mergedData);
   const totalCount = mergedData.reduce((s, r) => s + r.count, 0);
-  renderSpeciesCard(opt.dataset.he, opt.dataset.sci, totalCount);
+  renderSpeciesCard(opt.dataset, totalCount);
 }
 
 // ── INITIAL FULL HEATMAP ──────────────────────────────────────
@@ -603,17 +631,67 @@ async function loadAllSpeciesHeatmap() {
   drawHeatmap(mergedData);
 }
 
-function renderSpeciesCard(he, sci, count) {
+const SKULL_FULL = `<svg viewBox="0 0 100 100" fill="currentColor"><ellipse cx="50" cy="42" rx="32" ry="30"/><rect x="30" y="65" width="40" height="8" rx="3"/><rect x="30" y="76" width="40" height="8" rx="3"/><rect x="28" y="63" width="6" height="22" rx="2"/><rect x="42" y="63" width="6" height="22" rx="2"/><rect x="56" y="63" width="6" height="22" rx="2"/><rect x="66" y="63" width="6" height="22" rx="2"/><circle cx="37" cy="42" r="9" fill="white" opacity="0.9"/><circle cx="63" cy="42" r="9" fill="white" opacity="0.9"/><circle cx="37" cy="42" r="5" fill="currentColor"/><circle cx="63" cy="42" r="5" fill="currentColor"/></svg>`;
+const SKULL_HALF = `<svg viewBox="0 0 100 100"><defs><clipPath id="lh"><rect x="0" y="0" width="50" height="100"/></clipPath></defs><g fill="currentColor"><ellipse cx="50" cy="42" rx="32" ry="30"/><rect x="30" y="65" width="40" height="8" rx="3"/><rect x="30" y="76" width="40" height="8" rx="3"/><rect x="28" y="63" width="6" height="22" rx="2"/><rect x="42" y="63" width="6" height="22" rx="2"/><rect x="56" y="63" width="6" height="22" rx="2"/><rect x="66" y="63" width="6" height="22" rx="2"/><circle cx="37" cy="42" r="9" fill="white" opacity="0.9"/><circle cx="63" cy="42" r="9" fill="white" opacity="0.9"/><circle cx="37" cy="42" r="5" fill="currentColor"/><circle cx="63" cy="42" r="5" fill="currentColor"/></g><g fill="currentColor" opacity="0.15" clip-path="url(#lh)" transform="scale(-1,1) translate(-100,0)"><ellipse cx="50" cy="42" rx="32" ry="30"/><rect x="30" y="65" width="40" height="8" rx="3"/><rect x="30" y="76" width="40" height="8" rx="3"/><rect x="28" y="63" width="6" height="22" rx="2"/><rect x="42" y="63" width="6" height="22" rx="2"/><rect x="56" y="63" width="6" height="22" rx="2"/><rect x="66" y="63" width="6" height="22" rx="2"/></g></svg>`;
+
+function formatSize(mm) {
+  if (!mm) return null;
+  mm = parseInt(mm);
+  if (mm >= 1000) return `${(mm/1000).toFixed(1).replace('.0','')} מ׳`;
+  return `${Math.round(mm/10)} ס"מ`;
+}
+
+function renderSpeciesCard(d, count) {
   const el = document.getElementById('species-card');
-  if (!he) { el.innerHTML = '<div class="sp-placeholder">בחר מין מהרשימה כדי לראות מידע על המין ונתוני תצפיות</div>'; return; }
+  if (!d) { el.innerHTML = '<div class="sp-placeholder">בחר מין מהרשימה כדי לראות מידע על המין ונתוני תצפיות</div>'; return; }
+
+  // Venom badge
+  let venomBadge = '';
+  if (d.venom === 'ארסי')       venomBadge = `<span class="sp-badge sp-badge-venomous">${SKULL_FULL}ארסי</span>`;
+  else if (d.venom === 'תת-ארסי') venomBadge = `<span class="sp-badge sp-badge-subvenomous">${SKULL_HALF}תת-ארסי</span>`;
+  else if (d.venom === 'לא ארסי') venomBadge = `<span class="sp-badge sp-badge-nonvenomous">✓ לא ארסי</span>`;
+
+  // Activity badge
+  let actBadge = '';
+  if (d.active === 'יומי')         actBadge = `<span class="sp-badge sp-badge-day">☀️ יומי</span>`;
+  else if (d.active === 'לילי')    actBadge = `<span class="sp-badge sp-badge-night">🌙 לילי</span>`;
+  else if (d.active === 'יומי ולילי') actBadge = `<span class="sp-badge sp-badge-both">☀️🌙 יומי ולילי</span>`;
+
+  // Size badge
+  const sizeStr = formatSize(d.size);
+  const sizeBadge = sizeStr ? `<span class="sp-badge">📏 עד ${sizeStr}</span>` : '';
+
+  // Conservation badge
+  const consMap = { LC:'lc', EN:'en', VU:'vu', NT:'nt', CR:'cr' };
+  const consLabels = { LC:'לא בסיכון', EN:'בסכנת הכחדה', VU:'עתידו בסכנה', NT:'קרוב לסיכון', CR:'בסכנה קריטית' };
+  const consKey = (d.cons||'').toUpperCase().trim();
+  const consBadge = consKey && consMap[consKey]
+    ? `<div class="sp-cons sp-cons-${consMap[consKey]}">${consKey} · ${consLabels[consKey]}</div>` : '';
+
+  // Photo
+  const photoHtml = d.photo
+    ? `<div class="sp-photo"><img src="${d.photo}" alt="${d.he}" loading="lazy" onerror="this.parentElement.style.display='none'">${consBadge}</div>`
+    : (consBadge ? `<div class="sp-photo" style="height:auto;padding:0.5rem">${consBadge}</div>` : '');
+
+  // Diet & description
+  const dietHtml   = d.diet ? `<div class="sp-diet">🍽️ <strong>תזונה:</strong> ${d.diet}</div>` : '';
+  const descHtml   = d.desc ? `<div class="sp-desc">${d.desc}</div>` : '';
+
   el.innerHTML = `
-    <div class="sp-name-he">${he}</div>
-    <div class="sp-name-sci">${sci}</div>
-    <div class="sp-desc">תוכן כרטיס המין יתווסף בהמשך על ידי הצוות.</div>
+    ${photoHtml}
+    <div class="sp-name-he">${d.he}</div>
+    <div class="sp-name-sci">${d.sci}</div>
+    <div class="sp-badges">${venomBadge}${actBadge}${sizeBadge}</div>
+    ${dietHtml}
+    ${descHtml}
     <div class="sp-stats">
       <div class="sp-stat">
         <div class="sp-stat-n">${(count||0).toLocaleString('he-IL')}</div>
         <div class="sp-stat-l">תצפיות מאומתות</div>
+      </div>
+      <div class="sp-stat">
+        <div class="sp-stat-n">${Object.keys(mergedGridCache||{}).length || '—'}</div>
+        <div class="sp-stat-l">ריבועי תפוצה</div>
       </div>
     </div>`;
 }
