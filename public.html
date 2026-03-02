@@ -185,6 +185,7 @@ header{
 .sp-badge-venomous{border-color:#e08080;background:#fdf0f0;color:#902020}
 .sp-badge-subvenomous{border-color:#e0b860;background:#fdf8e8;color:#7a4a10}
 .sp-badge-nonvenomous{border-color:#80c080;background:#f0fdf0;color:#206020}
+.sp-badge-poisonous{border-color:#b080d0;background:#f8f0fd;color:#5a2080}
 .sp-badge-day{border-color:#e8c870;background:#fdf8e8;color:#7a5a10}
 .sp-badge-night{border-color:#a0a8d0;background:#f0f0f8;color:#383870}
 .sp-badge-both{border-color:#c8b880;background:#faf4e4;color:#5a4a18}
@@ -561,6 +562,7 @@ async function loadSpeciesDropdown() {
   const seen = {};
   data.forEach(s => {
     const name = s.common_name || 'לא ידוע';
+    if (name === 'לא מזוהה') return; // exclude from public dropdown
     if (!nameToIds[name]) nameToIds[name] = [];
     nameToIds[name].push(s.id);
     if (!seen[name]) {
@@ -650,6 +652,7 @@ function renderSpeciesCard(d, count) {
   if (d.venom === 'ארסי')       venomBadge = `<span class="sp-badge sp-badge-venomous">${SKULL_FULL}ארסי</span>`;
   else if (d.venom === 'תת-ארסי') venomBadge = `<span class="sp-badge sp-badge-subvenomous">${SKULL_HALF}תת-ארסי</span>`;
   else if (d.venom === 'לא ארסי') venomBadge = `<span class="sp-badge sp-badge-nonvenomous">✓ לא ארסי</span>`;
+  else if (d.venom === 'רעיל')    venomBadge = `<span class="sp-badge sp-badge-poisonous"><svg viewBox="0 0 100 100" fill="currentColor"><path d="M50 8 L95 88 L5 88 Z"/><rect x="46" y="35" width="8" height="30" rx="3" fill="white"/><circle cx="50" cy="76" r="5" fill="white"/></svg>רעיל</span>`;
 
   // Activity badge
   let actBadge = '';
