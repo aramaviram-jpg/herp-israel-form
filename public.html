@@ -562,7 +562,7 @@ async function loadSpeciesDropdown() {
   const seen = {};
   data.forEach(s => {
     const name = s.common_name || 'לא ידוע';
-    if (name === 'לא מזוהה') return; // exclude from public dropdown
+    if (name === 'לא מזוהה' || name.includes('(סוג)')) return; // exclude unidentified and genus-level entries
     if (!nameToIds[name]) nameToIds[name] = [];
     nameToIds[name].push(s.id);
     if (!seen[name]) {
