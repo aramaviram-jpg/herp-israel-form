@@ -1,7 +1,7 @@
 # Herp Israel Project - Comprehensive Guide
 
-**Complete Documentation for Wildlife Reporting System**  
-Last Updated: February 2026
+**Complete Documentation for Wildlife Reporting System**
+Last Updated: March 2026
 
 ---
 
@@ -10,36 +10,49 @@ Last Updated: February 2026
 1. [Project Overview](#project-overview)
 2. [System Architecture](#system-architecture)
 3. [Account Management](#account-management)
-4. [Admin Dashboard Guide](#admin-dashboard-guide)
-5. [Data Management](#data-management)
-6. [Species Management](#species-management)
-7. [Legacy Data Import](#legacy-data-import)
-8. [Maintenance & Monitoring](#maintenance--monitoring)
-9. [Technical Reference](#technical-reference)
-10. [Troubleshooting](#troubleshooting)
+4. [Public Page Guide](#public-page-guide)
+5. [Submission Form Guide](#submission-form-guide)
+6. [Admin Dashboard Guide](#admin-dashboard-guide)
+7. [Data Management](#data-management)
+8. [Species Management](#species-management)
+9. [Legacy Data Import](#legacy-data-import)
+10. [Maintenance & Monitoring](#maintenance--monitoring)
+11. [Technical Reference](#technical-reference)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Project Overview
 
 ### Purpose
-Community-driven citizen science platform for tracking reptile and amphibian sightings across Israel.
+
+Community-driven citizen science platform for tracking reptile and amphibian sightings across Israel. Members of the public submit sightings via a web form; trained admins validate submissions; all validated data appears on a public-facing statistics and map page.
 
 ### Key Features
+
 - Mobile-friendly public submission form
-- GPS location capture (auto, manual, or map selection)
-- Photo uploads (stored as Google Drive links)
-- Admin dashboard with validation workflow
-- Interactive map visualization
-- Data export (CSV)
-- Multi-admin support
+- GPS location capture (automatic, map-based, or manual)
+- Photo uploads (stored in Supabase Storage bucket)
+- Admin dashboard with validation **and** full editing workflow
+- Interactive species distribution map with GeoJSON range overlays (94 species)
+- Heatmap of sightings loaded from a pre-aggregated database view
+- Species information cards with venom/poison/activity/size/diet/conservation data
+- Custom SVG venom & poison iconography
+- Live statistics: total sightings, validated count, reported species, last-week activity
+- Seasonal bar chart and top-species / family breakdown charts
+- Data export to CSV (all records or filtered)
+- Multi-admin support with per-admin audit trail
 
 ### Technology Stack
-- **Frontend:** HTML, JavaScript, Leaflet (maps)
-- **Backend:** Supabase (PostgreSQL database)
-- **Hosting:** Vercel (GitHub auto-deploy)
-- **Storage:** Supabase Storage (photos)
-- **Version Control:** GitHub
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | HTML5, vanilla JavaScript, Leaflet 1.9.4 (maps) |
+| Backend | Supabase (PostgreSQL + Row Level Security) |
+| Hosting | Vercel (auto-deploys from GitHub) |
+| Photo Storage | Supabase Storage bucket (`eport-photos`) |
+| Distribution Data | `herp.geojson` (94 species, served from repo root) |
+| Version Control | GitHub (web interface only — no local Git) |
 
 ---
 
@@ -48,35 +61,48 @@ Community-driven citizen science platform for tracking reptile and amphibian sig
 ### Component Diagram
 
 ```
-┌─────────────────┐
-│   Public Form   │ → herp-israel-form.vercel.app
-└────────┬────────┘
-         │
-         ↓
-┌─────────────────┐
-│    Supabase     │ → Database + Storage + Auth
-│   (PostgreSQL)  │
-└────────┬────────┘
-         │
-         ↓
-┌─────────────────┐
-│ Admin Dashboard │ → /admin.html
-└─────────────────┘
+┌──────────────────────┐   ┌──────────────────────┐   ┌──────────────────────┐
+│   Public Form        │   │   Public Page         │   │   Admin Dashboard    │
+│   index.html         │   │   public.html         │   │   admin.html         │
+│ (submit sightings)   │   │ (stats, map, species) │   │ (validate / edit)    │
+└──────────┬───────────┘   └──────────┬────────────┘   └──────────┬───────────┘
+           │                          │                            │
+           └──────────────────────────┼────────────────────────────┘
+                                      ↓
+                          ┌───────────────────────┐
+                          │        Supabase        │
+                          │  PostgreSQL + RLS      │
+                          │  Storage (photos)      │
+                          │  Auth (admin users)    │
+                          └───────────────────────┘
+                                      ↑
+                          ┌───────────────────────┐
+                          │     herp.geojson       │
+                          │  (served from repo)    │
+                          │  94 species ranges     │
+                          └───────────────────────┘
 ```
 
 ### Data Flow
 
 **Public Submission:**
-1. User fills form → herp-israel-form.vercel.app
-2. Photos uploaded to Supabase Storage
-3. Data inserted into `reports` table
-4. Status = "Pending Review"
+1. User fills form on `index.html`
+2. Photos uploaded directly to Supabase Storage (`eport-photos` bucket)
+3. Report data (including storage URLs) inserted into `reports` table
+4. RLS policy allows anonymous INSERT
+
+**Public Page:**
+1. Loads stats from `public_reports_safe` view (RLS-safe, SELECT permitted)
+2. Heatmap loaded from `public_heatmap_grid` view (pre-aggregated grid cells)
+3. Species distribution overlay fetched from `/herp.geojson` (repo root)
+4. Species card data fetched from `species` table (full column set)
 
 **Admin Validation:**
-1. Admin logs in → /admin.html
-2. Views pending reports
-3. Validates/rejects with notes
-4. Status updated in database
+1. Admin logs in → Supabase Auth
+2. Views full `reports` table (RLS grants SELECT to authenticated users)
+3. Validates / rejects / edits records
+4. `validated_by` + `validated_at` written on validation actions
+5. `updated_by` + `updated_at` written on any edit save
 
 ---
 
@@ -84,240 +110,349 @@ Community-driven citizen science platform for tracking reptile and amphibian sig
 
 ### Supabase Account
 
-**Purpose:** Database, storage, authentication
+**Purpose:** Database, Storage, Authentication
 
 **Access:**
 - URL: https://supabase.com
 - Project: herp-israel
+- Project ID: qobayftqligpshmyweio
 - Dashboard: https://supabase.com/dashboard/project/qobayftqligpshmyweio
 
 **Key Sections:**
-- **Table Editor:** View/edit data directly
-- **Authentication:** Manage admin users
-- **Storage:** View uploaded photos
-- **Database:** Monitor size and performance
-- **SQL Editor:** Run custom queries
+- **Table Editor** — View/edit `reports` and `species` tables directly
+- **Authentication** — Manage admin users
+- **Storage** — View photos in `eport-photos` bucket
+- **Database → Usage** — Monitor storage size
+- **SQL Editor** — Run custom queries
 
 ### Vercel Account
 
-**Purpose:** Website hosting and deployment
+**Purpose:** Website hosting and automatic deployment
 
 **Access:**
 - URL: https://vercel.com
-- Login: Via GitHub (no separate password)
+- Login: Via GitHub (no separate password needed)
 - Project: herp-israel-form
 
-**Key Features:**
-- Auto-deploys from GitHub commits
-- Shows deployment history
-- Provides analytics
-- Custom domain support (future)
+**Deployment:**
+- Any commit to GitHub triggers an automatic Vercel deployment (~30 seconds)
+- Deployment history and logs visible in the Vercel dashboard
 
 ### GitHub Account
 
-**Purpose:** Source code storage and version control
+**Purpose:** Source code storage, version control
 
 **Repository:** herp-israel-form
 
 **Files:**
-- `index.html` - Public submission form
-- `admin.html` - Admin dashboard
-- `vercel.json` - Deployment configuration
+- `index.html` — Public submission form
+- `public.html` (currently named `public (5).html` locally) — Public stats/map page
+- `admin.html` — Admin dashboard
+- `herp.geojson` — Species distribution polygons (94 species)
+- `vercel.json` — Deployment configuration (`{"version": 2}`)
 
 **Workflow:**
-1. Edit files on GitHub
+1. Edit files on GitHub (web editor)
 2. Commit changes
 3. Vercel auto-deploys (30 seconds)
 4. Live site updates
+
+**Important:** There is no local Git environment. All edits are made through the GitHub web interface. There is no staging environment — commits go directly to production.
 
 ### Admin Users
 
 **Managed in:** Supabase → Authentication → Users
 
 **Current Admins:**
-- aram.aviram@gmail.com (you)
-- [Other admin emails]
+- aram.aviram@gmail.com (project owner)
 
-**Adding New Admin:**
+**Adding a New Admin:**
 1. Supabase → Authentication → Users
 2. "Add user" → "Create new user"
 3. Enter email and password
 4. ✅ **Important:** Check "Auto Confirm User"
 5. Click "Create user"
-6. Manually share credentials (no email sent)
+6. Share credentials manually — no email is sent automatically
+
+---
+
+## Public Page Guide
+
+The public page (`public.html`) is the citizen-facing read-only display of all validated data. It has no authentication requirement.
+
+### Page Sections
+
+**Hero / Info Boxes (top)**
+
+Four live statistics fetched from `public_reports_safe`:
+- 📍 Total sightings in the database
+- ✅ Validated sightings
+- 🔬 Number of distinct reported species
+- 📅 Species reported in the last 7 days (highlighted in green)
+
+**Map Section — "מפת פיזור לפי מין"**
+
+The central map section contains two panels side by side:
+
+*Left panel — interactive map:*
+- Base tiles from CartoDB light
+- **Heatmap layer** — loaded from `public_heatmap_grid` view (pre-aggregated grid cells with `grid_x`, `grid_y`, `count` columns); renders as colored rectangles. When no species is selected, the full dataset heatmap is shown; when a species is selected, only that species' cells are shown.
+- **Distribution layer** — when a species is selected, a GeoJSON polygon for that species is loaded from `/herp.geojson` and rendered beneath the heatmap. Matched by `binomial` property (first two words of scientific name). The GeoJSON is loaded once and cached. The layer is sourced from IUCN data (credit shown in footer).
+- No individual pin markers on this page (heatmap only)
+
+*Right panel — tabbed:*
+- **Species card** — shows detailed info for the selected species (see Species Cards section below)
+- **Recent sightings** — list of the most recent validated reports with date and species name
+
+**Charts Section — "נתונים ותובנות"**
+
+Three chart panels:
+1. **Seasonal chart** ("עונתיות — תצפיות לפי חודש") — SVG bar chart of report counts by calendar month, loaded from `public_reports_safe`. Bars are color-coded (amber/gold). Month labels in Hebrew. Max value shown on Y axis.
+2. **Top species** ("10 המינים הנפוצים ביותר") — Horizontal bar list of top 10 reported species with counts, loaded from `public_reports_safe`.
+3. **Family breakdown** ("פילוח לפי קבוצה") — Horizontal bar list of sighting counts by taxonomic family, loaded from `public_reports_safe`.
+
+### Species Dropdown
+
+- Populated from the `species` table (full set)
+- **Filtering:** Entries are excluded from the dropdown if they match any of:
+  - `common_name === 'לא מזוהה'` (unidentified)
+  - `common_name` includes `'(סוג)'` (genus-level entry)
+  - `scientific_name` is a single word (genus-only binomial)
+- Selecting a species triggers: heatmap filtered to that species + distribution polygon loaded + species card rendered
+- Clearing selection restores the full-dataset heatmap and clears the species card
+
+### Species Cards
+
+Species cards display rich data for the selected species, all sourced from the `species` table:
+
+| Field | Column | Display |
+|-------|--------|---------|
+| Hebrew name | `common_name` | Card title |
+| Scientific name | `scientific_name` | Subtitle |
+| Venom/Poison status | `venom_level` | Colored badge with custom SVG icon |
+| Activity time | `activity_time` | Colored badge (day/night/both) |
+| Max size | `max_size_mm` | Badge (converted from mm to cm display) |
+| Diet | `diet` | "🍽️ תזונה:" row |
+| Description | `description` | Styled text block |
+| Photo | `photo_url` | Species image at top of card |
+| Conservation status | `red_list_status` | IUCN status label |
+| Sighting count | derived | "N תצפיות במאגר" shown below card |
+
+**Venom/Poison badges (with custom SVG icons):**
+- `ארסי` (venomous) — full skull SVG, red badge
+- `תת-ארסי` (sub-venomous) — half skull SVG (left side faded), amber badge
+- `לא ארסי` (non-venomous) — ✓ checkmark, green badge
+- `רעיל` (poisonous — contact/ingestion toxin) — warning triangle SVG, purple badge
+
+**Activity badges:**
+- `יום` (diurnal) — amber badge
+- `לילה` (nocturnal) — blue/grey badge
+- `יום ולילה` (both) — mixed badge
+
+---
+
+## Submission Form Guide
+
+The public form (`index.html`) is the entry point for citizen scientists to submit sightings.
+
+### Required Fields (marked *)
+
+- Full name
+- Sighting date (defaults to today)
+- Species (dropdown, all 102+ species from `species` table)
+- Number of individuals (1–10, "הרבה" / "לא ידוע")
+- Location description *
+
+### Optional Fields
+
+- Time of sighting
+- GPS coordinates (via one of three methods — see below)
+- Sighting details (context, behavior, microhabitat)
+- Photos (multiple allowed)
+- Additional comments
+- Contact details
+
+### Location Capture — Three Methods
+
+**1. Auto GPS** — "📍 אתר מיקומי אוטומטית"
+Uses the browser Geolocation API. On success, stores coordinates as hidden fields and shows a status message. On failure, shows an error with instructions.
+
+**2. Map Selection** — "🗺️ בחר מיקום על מפה"
+Opens a Leaflet map modal centered on Israel. User clicks to place a pin; coordinates are confirmed and stored. The modal can be closed without saving.
+
+**3. Manual Entry** — "✏️ הזן קואורדינטות ידנית"
+Toggles a pair of text inputs for latitude and longitude (decimal degrees). A "שמור מיקום" button validates and stores them.
+
+All three methods write to hidden `latitude` and `longitude` fields on the form.
+
+### Photo Upload
+
+- Multiple files accepted
+- Uploaded to Supabase Storage bucket `eport-photos`
+- Public URLs stored in `photo_urls` (JSON array) on the report record
+- No hard client-side file size limit enforced (Supabase limit applies)
+
+### Form Submission
+
+On submit, the form:
+1. Uploads any selected photos to `eport-photos` and collects their public URLs
+2. Inserts a row into `reports` with all fields
+3. Initial `status` = `"Pending Review"`
+4. Shows success or error message
+
+RLS policy: anonymous users can INSERT but not SELECT/UPDATE/DELETE.
 
 ---
 
 ## Admin Dashboard Guide
 
-### Login
-
 **URL:** https://herp-israel-form.vercel.app/admin.html
 
-**Process:**
-1. Enter admin email (from Supabase users)
+### Login
+
+1. Enter admin email
 2. Enter password
 3. Click "התחבר"
 
-**Important:** After using admin dashboard, click "התנתק" (logout) before testing public form - otherwise you'll get permission errors.
+**Important:** After using the admin dashboard, click "התנתק" before testing the public form in the same browser session — authenticated state can cause RLS errors on the public form.
 
-### Dashboard Overview
+### Dashboard Layout
 
-**Statistics Cards (Top):**
-- Total Reports
-- Pending Review (needs attention)
-- Validated
-- Rejected
+**Statistics Cards (top):**
+- Total reports
+- ממתינים לאימות (Pending)
+- מאומתות (Validated)
+- נדחות (Rejected)
 
-**Filters Section:**
-- Status dropdown
-- Family dropdown
-- Species dropdown
-- Date range (from → to)
-- Apply / Clear buttons
-- Export buttons (All / Filtered)
+**Filters:**
+- Status (Pending / Validated / Rejected)
+- Family (taxonomic family)
+- Species
+- Date range (from / to)
 
-**Map Section:**
-- Shows ALL sightings with GPS
-- Color-coded by status:
-  - 🟠 Orange = Pending Review
-  - 🟢 Green = Validated
-  - 🔴 Red = Rejected
-- Click markers to view details
-- Draw area tool for filtering
+**Action buttons:**
+- "החל סינון" — apply filters
+- "נקה" — clear all filters
+- "ייצא הכל ל-CSV" — export all records ignoring filters
+- "ייצא מסונן ל-CSV" — export records matching current filters
 
-**Reports Table:**
-- Shows 100 records per page
-- Columns: Date, Reporter, Species, Quantity, Location, Status, Actions
-- Pagination at bottom
-- "צפה" button opens detail modal
+**Map:** Shows ALL sightings with GPS coordinates (not paginated), color-coded by status:
+- 🟠 Orange = Pending Review
+- 🟢 Green = Validated
+- 🔴 Red = Rejected
+
+**Reports Table:** 100 records per page. Columns: Date, Reporter, Species, Quantity, Location, Status, Actions. Pagination at bottom.
 
 ### Viewing Report Details
 
-**Click "צפה" to open modal:**
+Click "צפה" on any row to open the detail modal.
 
-**Report Information:**
+**Information shown:**
 - Reporter name and contact
 - Date and time
-- Species (editable - click to change)
+- Species (with inline quick-change dropdown)
 - Number of individuals
-- GPS coordinates (if available)
+- GPS coordinates
 - Location description
 - Sighting details
 - Additional comments
-- Photo gallery (click to enlarge)
+- Photos (click to enlarge)
+- Validated by / validated at (if applicable)
+- Validation notes (if any)
 
-**Validation Actions:**
-- **אמת (Validate):** Marks as validated, adds your email & timestamp
-- **דחה (Reject):** Marks as rejected
-- **חזור לממתין (Return to Pending):** Resets status
-- **Validation Notes:** Optional notes field
+### Validation Workflow
 
-**Editing Species:**
-- Click on species name
-- Dropdown appears with all 102 species
-- Select correct species
-- Auto-saves
+In the detail modal:
 
-### Using Filters
+- **אמת (Validate):** Sets `status = 'Validated'`, writes `validated_by` (admin email) and `validated_at` (timestamp)
+- **דחה (Reject):** Sets `status = 'Rejected'`
+- **חזור לממתין (Return to Pending):** Resets status to `'Pending Review'`
+- **Validation notes field:** Optional free text; saved with the validation action
 
-**Status Filter:**
-- ממתין לאימות (Pending Review)
-- מאומת (Validated)  
-- נדחה (Rejected)
+**Quick species change** (separate from full edit):
+- Click on the species name inside the detail modal
+- Dropdown with all species appears
+- Select a species and it saves immediately (no TEST_MODE guard on this action)
 
-**Family Filter:**
-- Shows all taxonomic families
-- E.g., "Viperidae צפעיים"
+### Edit Workflow
 
-**Species Filter:**
-- All 102 species in Hebrew
+The admin dashboard includes a full record editor, separate from the validation workflow.
 
-**Date Range:**
-- מתאריך (From)
-- עד תאריך (To)
+**Opening the editor:**
+1. Open a report's detail modal (click "צפה")
+2. Click the "✏️ ערוך דיווח" button (top right of modal)
+3. The modal switches to an edit form
 
-**Applying Filters:**
-1. Select filter values
-2. Click "החל סינון"
-3. Both map and table update
-4. Pagination resets to page 1
+**Editable fields:**
+- Date
+- Time
+- Full name (reporter)
+- Species (dropdown)
+- Number of individuals
+- Latitude / Longitude (with embedded mini-map for drag-to-set)
+- Location description
+- Sighting details
+- Additional comments
+- Contact details
 
-**Clearing Filters:**
-- Click "נקה" to reset all
+**GPS edit map:**
+The edit form includes a small embedded Leaflet map. The pin position reflects the current stored coordinates. Dragging the pin updates the lat/lng input fields in real time. Saving captures the input field values.
+
+**TEST_MODE flag:**
+
+There is a constant `TEST_MODE` at the top of the admin script:
+
+```javascript
+const TEST_MODE = false;
+```
+
+When set to `true`:
+- A yellow warning banner is shown inside the edit modal: "⚠️ מצב בדיקה: שינויים לא יישמרו בפועל"
+- Clicking "שמור שינויים" logs the payload to the browser console but does NOT write to the database
+- An alert confirms: "מצב בדיקה: השינויים לא נשמרו בפועל. כדי לשמור בפועל, שנה TEST_MODE ל-false בקוד."
+
+When set to `false` (production default):
+- "שמור שינויים" writes the updated fields to the `reports` table
+- `updated_by` is set to the current admin's email
+- `updated_at` is set to the current ISO timestamp
+
+**Audit columns written on edit save:**
+- `updated_by` (text) — admin email
+- `updated_at` (timestamp) — ISO timestamp
 
 ### Map Features
 
-**View All Sightings:**
-- Automatically centers on Israel
-- Zooms to show all pins
-- Loads all records (may take a few seconds for 6000+ pins)
-
 **Area Selection:**
 1. Click "📐 בחר אזור במפה"
-2. Cursor changes to crosshair
-3. Click once to start rectangle
-4. Move mouse to desired corner
-5. Click again to finish
-6. Green rectangle appears
-7. Map and table filter to that area
-8. Shows count: "סה״כ תצפיות נכפות: 22"
-
-**Clear Area:**
-- Click "✖ נקה בחירת אזור" button
-- Removes rectangle and filter
+2. Click once to anchor the first corner of a rectangle
+3. Move mouse and click again to complete
+4. A green rectangle appears; table and map filter to records within the area
+5. Shows count: "סה״כ תצפיות נבחרות: N"
+6. Click "✖ נקה בחירת אזור" to clear
 
 **Overlapping Markers:**
-- When multiple reports at same location
-- Popup shows: "X דיווחים במיקום זה"
-- Lists all reports
-- Each has "צפה בדיווח" button
+When multiple reports share the same GPS coordinates, a popup lists all of them with a "צפה בדיווח" button for each.
 
 ### Pagination
 
-**Table Shows:**
 - 100 records per page
-- Bottom displays: "מציג 1-100 מתוך 6110 דיווחים"
-- Current page / total pages: "עמוד 1 מתוך 62"
-
-**Navigation:**
-- "← הקודם" (Previous)
-- "הבא →" (Next)
-- Buttons disabled when at first/last page
-
-**Important:** Map ALWAYS shows ALL records, not just current page
+- Status bar: "מציג 1–100 מתוך N דיווחים" / "עמוד 1 מתוך N"
+- ← הקודם / הבא → navigation buttons
+- Map always shows ALL records, not just the current page
 
 ### Export Data
 
 **Export All (ייצא הכל ל-CSV):**
-- Fetches ALL records from database
-- Ignores current filters
-- Downloads complete dataset
+- Fetches all records regardless of current filters
 - Filename: `reports_all.csv`
-- Shows progress: "מייצא את כל הנתונים..."
+- Shows progress message while fetching
 
 **Export Filtered (ייצא מסונן ל-CSV):**
-- Exports all records matching current filters
-- If 500 records match filter → exports all 500
+- Exports all records matching current active filters (ignores pagination)
 - Filename: `reports_filtered.csv`
 
-**CSV Columns:**
-- תאריך (Date)
-- שעה (Time)
-- שם מדווח (Reporter Name)
-- מין (Species - Hebrew)
-- שם מדעי (Scientific Name)
-- משפחה (Family)
-- כמות (Quantity)
-- קו רוחב (Latitude)
-- קו אורך (Longitude)
-- תיאור מיקום (Location Description)
-- פרטי תצפית (Sighting Details)
-- הערות (Comments)
-- פרטי קשר (Contact Details)
-- סטטוס (Status)
-- אומת ע"י (Validated By)
-- הערות אימות (Validation Notes)
+**CSV columns:**
+תאריך, שעה, שם מדווח, מין, שם מדעי, משפחה, כמות, קו רוחב, קו אורך, תיאור מיקום, פרטי תצפית, הערות, פרטי קשר, סטטוס, אומת ע"י, הערות אימות
 
 ---
 
@@ -325,83 +460,114 @@ Community-driven citizen science platform for tracking reptile and amphibian sig
 
 ### Database Schema
 
-**Tables:**
+**Table: `species`**
 
-**1. species**
-- `id` (integer, primary key)
-- `common_name` (text) - Hebrew name
-- `scientific_name` (text)
-- `family` (text) - Taxonomic family
-- **Records:** 102 species
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | integer (PK) | Auto-increment |
+| `common_name` | text | Hebrew name |
+| `scientific_name` | text | Latin binomial |
+| `family` | text | Hebrew + Latin (e.g., "צפעיים Viperidae") |
+| `venom_level` | text | ארסי / תת-ארסי / לא ארסי / רעיל |
+| `activity_time` | text | יום / לילה / יום ולילה |
+| `max_size_mm` | integer | Maximum length in mm |
+| `diet` | text | Diet description (Hebrew) |
+| `description` | text | Species description (Hebrew) |
+| `photo_url` | text | URL to species representative photo |
+| `red_list_status` | text | IUCN Red List category |
 
-**2. reports**
-- `id` (integer, primary key)
-- `created_at` (timestamp)
-- `full_name` (text) - Reporter name
-- `date` (date) - Sighting date
-- `time` (time) - Sighting time
-- `species_id` (foreign key → species)
-- `number_of_individuals` (text) - "1", "2", ..., "10", "Many", "Unknown count"
-- `latitude` (numeric) - GPS coordinate
-- `longitude` (numeric) - GPS coordinate
-- `location_description` (text)
-- `sighting_details` (text)
-- `photo_urls` (json array) - Google Drive links
-- `additional_comments` (text)
-- `contact_details` (text)
-- `status` (text) - "Pending Review", "Validated", "Rejected"
-- `validated_by` (text) - Admin email
-- `validated_at` (timestamp)
-- `validation_notes` (text)
+**Table: `reports`**
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | integer (PK) | Auto-increment |
+| `created_at` | timestamp | Row creation time (auto) |
+| `full_name` | text | Reporter name |
+| `date` | date | Sighting date |
+| `time` | time | Sighting time (optional) |
+| `species_id` | integer (FK → species) | |
+| `number_of_individuals` | text | "1"–"10", "הרבה", "לא ידוע" |
+| `latitude` | numeric | GPS decimal degrees (optional) |
+| `longitude` | numeric | GPS decimal degrees (optional) |
+| `location_description` | text | Free text location |
+| `sighting_details` | text | Behavioral / habitat notes |
+| `photo_urls` | json | Array of Supabase Storage URLs |
+| `additional_comments` | text | Extra notes |
+| `contact_details` | text | Reporter contact info |
+| `status` | text | "Pending Review" / "Validated" / "Rejected" |
+| `validated_by` | text | Admin email who validated |
+| `validated_at` | timestamp | Validation time |
+| `validation_notes` | text | Admin notes on validation |
+| `updated_by` | text | Admin email of last editor (edit workflow) |
+| `updated_at` | timestamp | Timestamp of last edit |
+
+**Views:**
+
+| View | Purpose | SELECT allowed by |
+|------|---------|------------------|
+| `public_reports_safe` | Safe public read of reports (no PII) | Anonymous (RLS) |
+| `public_heatmap_grid` | Pre-aggregated grid for heatmap | Anonymous (RLS) |
+
+### Row Level Security (RLS) Summary
+
+| Table/View | Anonymous | Authenticated Admin |
+|------------|-----------|---------------------|
+| `reports` — INSERT | ✅ Allowed | ✅ Allowed |
+| `reports` — SELECT | ❌ Denied | ✅ Allowed |
+| `reports` — UPDATE | ❌ Denied | ✅ Allowed |
+| `public_reports_safe` — SELECT | ✅ Allowed | ✅ Allowed |
+| `public_heatmap_grid` — SELECT | ✅ Allowed | ✅ Allowed |
+| `species` — SELECT | ✅ Allowed | ✅ Allowed |
+
+### Storage Configuration
+
+**Bucket name:** `eport-photos`
+
+**Access:** Public read, anonymous upload allowed
+
+**File formats accepted:** JPG, PNG, GIF, WebP
+
+**Max file size:** Supabase platform limit applies (50MB per file)
+
+### GeoJSON Distribution Data
+
+**File:** `herp.geojson` (served from repo root via Vercel)
+
+**Contents:** 94 species range polygons, sourced from IUCN Red List data
+
+**Schema:** Each feature has a `properties.binomial` field (scientific name, two-word form)
+
+**Usage:** The public page fetches this file once, caches it in memory (`geojsonCache`), and looks up features by matching the first two words of the selected species' `scientific_name` against `properties.binomial`.
+
+**Update process:** Replace the file in the GitHub repository. The public page will pick it up on next load.
 
 ### Backup Procedures
 
 **Monthly Backup (Required):**
 
-1. **CSV Export:**
-   - Login to admin dashboard
-   - Click "ייצא הכל ל-CSV"
-   - Save file: `reports_backup_YYYY-MM.csv`
-   - Store on computer + external drive/cloud
+1. Login to admin dashboard
+2. Click "ייצא הכל ל-CSV"
+3. Save as: `reports_backup_YYYY-MM.csv`
+4. Also export species: Supabase → SQL Editor → `SELECT * FROM species ORDER BY common_name;`
+5. Store locally + Google Drive
 
-2. **Database Dump:**
-   - Supabase → SQL Editor
-   - Run: `SELECT * FROM reports;`
-   - Export results as CSV
-   - Save: `reports_db_YYYY-MM.csv`
+**Recommended file naming:**
+- `reports_backup_2026-03.csv`
+- `species_backup_2026-03.csv`
 
-3. **Species List:**
-   - Supabase → SQL Editor
-   - Run: `SELECT * FROM species;`
-   - Export as CSV
-   - Save: `species_YYYY-MM.csv`
-
-**Storage Locations:**
-- Computer: Documents/HerpIsrael/Backups/
-- Cloud: Google Drive/Backups/
-- External: USB drive/SD card
-
-**Retention:**
-- Keep last 12 months locally
-- Keep all-time in cloud
-- Archive old backups annually
+**Retention:** Keep last 12 months locally; keep all-time in cloud.
 
 ### Data Recovery
 
-**If Supabase fails or data lost:**
+If Supabase fails or data is lost:
 
-1. **Restore from CSV:**
-   - Create new Supabase project
-   - Create tables (use SQL from Technical Reference)
-   - Import CSV data
+1. Create new Supabase project
+2. Recreate tables using SQL from Technical Reference
+3. Re-import from CSV backup
+4. Update `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `index.html`, `admin.html`, and `public.html`
+5. Push to GitHub → Vercel auto-deploys
 
-2. **Update Connection:**
-   - Get new Supabase URL and keys
-   - Update in index.html and admin.html
-   - Push to GitHub
-   - Vercel auto-deploys
-
-**Total recovery time:** 2-3 hours
+**Estimated recovery time:** 2–4 hours
 
 ---
 
@@ -409,63 +575,50 @@ Community-driven citizen science platform for tracking reptile and amphibian sig
 
 ### Current Species List
 
-**Total:** 102 species
-**Categories:** Reptiles and Amphibians native to Israel
+**Total:** 102+ species (reptiles and amphibians native to Israel)
 
-**Families Include:**
-- Viperidae (Vipers)
-- Colubridae (Colubrids)
-- Gekkonidae (Geckos)
-- Lacertidae (Lizards)
-- Scincidae (Skinks)
-- Salamandridae (Salamanders)
-- Ranidae (Frogs)
-- Bufonidae (Toads)
-- Testudinidae (Tortoises)
-- And more...
+**Families include:** Viperidae, Colubridae, Gekkonidae, Lacertidae, Scincidae, Salamandridae, Ranidae, Bufonidae, Testudinidae, and others.
 
 ### Adding New Species
 
 **Method 1: Supabase UI**
 1. Supabase → Table Editor → species
 2. Click "Insert row"
-3. Fill fields:
-   - `common_name`: Hebrew name
-   - `scientific_name`: Latin name
-   - `family`: Taxonomic family (Hebrew + Latin)
-4. Click "Save"
+3. Fill: `common_name`, `scientific_name`, `family`
+4. Optionally fill extended fields: `venom_level`, `activity_time`, `max_size_mm`, `diet`, `description`, `photo_url`, `red_list_status`
+5. Click "Save"
 
 **Method 2: SQL**
 ```sql
-INSERT INTO species (common_name, scientific_name, family)
-VALUES ('אילנית הגולן', 'Hyla felixarabica', 'Hylidae אילניתיים');
+INSERT INTO species (common_name, scientific_name, family, venom_level, activity_time, max_size_mm, diet, description, red_list_status)
+VALUES ('שם עברי', 'Genus species', 'משפחה Family', 'לא ארסי', 'יום', 350, 'תיאור תזונה', 'תיאור המין', 'LC');
 ```
 
-**Changes appear immediately** in public form and admin dashboard.
+Changes appear immediately in the public form and admin dashboard.
 
 ### Editing Species
 
 1. Supabase → Table Editor → species
-2. Find species row
-3. Click on cell to edit
-4. Enter new value
-5. Press Enter to save
+2. Click the cell to edit
+3. Press Enter to save
 
-**Note:** Changing species names automatically updates all linked reports (via `species_id` foreign key).
+Changing `common_name` or `scientific_name` automatically updates all linked reports (via `species_id` foreign key).
 
-### Species Name Changes Over Time
+### Species Dropdown Filtering (Public Page)
 
-**Challenge:** Taxonomy changes; old reports have outdated names
+The public page species dropdown excludes:
+- `common_name === 'לא מזוהה'`
+- Names containing `'(סוג)'` (genus-level placeholder entries)
+- Species where `scientific_name` is a single word (no binomial)
 
-**Current Solution:**
-- Legacy imports store original name in `validation_notes`
-- All records linked to current species via `species_id`
-- Name updates propagate automatically
+This filtering is purely in the frontend; the full species table is still used for admin and form dropdowns.
 
-**Future Enhancement:**
-- Create `species_synonyms` table
-- Track historical names
-- Enable searches by old names
+### Adding Species Photos
+
+1. Upload an image to Supabase Storage (any bucket, or the web)
+2. Copy the public URL
+3. Paste into the `photo_url` column of the relevant species row
+4. The photo will appear at the top of the species card on the public page
 
 ---
 
@@ -473,156 +626,86 @@ VALUES ('אילנית הגולן', 'Hyla felixarabica', 'Hylidae אילניתי�
 
 ### Overview
 
-**Purpose:** Import historical sighting data from Google Sheets/Excel into database
+Historical sighting data from Google Sheets / Excel can be imported into the database.
 
 **Process:**
 1. Export Google Sheet to Excel (.xlsx)
 2. Map old species names to current names
-3. Run Python processing script
-4. Run Node.js import script
-5. Validate imported data
+3. Run Python processing script → produces JSON
+4. Run Node.js import script → inserts to Supabase
+5. Validate imported data in admin dashboard
 
 ### Prerequisites
 
-**Required Software:**
-- Node.js (https://nodejs.org)
+- Node.js
 - Python 3
-- npm packages: `@supabase/supabase-js`
-
-**Required Files:**
+- npm package: `@supabase/supabase-js`
 - Legacy Excel file
-- Species mapping (if names changed)
-- Import scripts (provided)
+- Import scripts (provided separately)
 
 ### Step 1: Prepare Data
 
-**Export from Google Sheets:**
-1. Open your legacy Google Sheet
-2. File → Download → Microsoft Excel (.xlsx)
-3. Save as: `legacy_data.xlsx`
+Export from Google Sheets: File → Download → Microsoft Excel (.xlsx)
 
-**Check Required Columns:**
+**Expected columns:**
 - Reporter name
-- Date (any format)
+- Date (any common format)
 - Species name (Hebrew)
 - Location description
 - GPS coordinates (optional)
-- Photo links (Google Drive URLs)
+- Photo links (Google Drive URLs, if any)
 
 ### Step 2: Species Mapping
 
-**If legacy data has different species names:**
-
-Create mapping file: `species_mapping.txt`
+If legacy data uses different or older species names, create `species_mapping.txt`:
 
 ```
-Old Name → Current Name
----
 גדילה מצויה → סלמנדרה כתומה
 צפע → צפע מצוי
 נחש המים → נחש מים
 ```
 
-**Work with Claude to:**
-1. Compare legacy names vs. current species table
-2. Identify unmatched names
-3. Map each old name to current name
-4. Handle uncertain/combined records
+Compare legacy names against the current `species` table. Work with Claude to resolve unmatched names.
 
 ### Step 3: Process Data
 
-**Run Python script:**
 ```bash
 python3 import_legacy_data.py
 ```
 
-**Output:**
-- `legacy_import_final.json` - Processed records ready for import
-- Shows summary: X records to import, Y skipped
+Output: `legacy_import_final.json` — processed records ready for insert.
 
-**Review Output:**
-- Check species mapping worked
-- Verify dates parsed correctly
-- Confirm GPS coordinates valid
+Review: check species mapping, date parsing, GPS coordinate validity.
 
 ### Step 4: Import to Supabase
 
-**Get Service Role Key:**
-1. Supabase → Settings → API
-2. Copy "service_role" key (NOT anon key)
-3. Edit `import_to_supabase.js`
-4. Paste key in line 13
+1. Supabase → Settings → API → copy **service_role** key (NOT the anon key)
+2. Edit `import_to_supabase.js`, paste the key on line 13
+3. Run:
 
-**Run Import:**
 ```bash
 npm install @supabase/supabase-js
 node import_to_supabase.js
 ```
 
-**Monitor Progress:**
-- Shows batch numbers (1/9, 2/9, etc.)
-- Reports success/errors per batch
-- Takes 2-3 minutes for 4000 records
-
-**Expected Output:**
-```
-Loading legacy data...
-Total records to import: 4047
-Fetching species IDs...
-Loaded 102 species mappings
-Prepared 4047 records for insert
-Importing batch 1/9 (500 records)...
-✅ Batch 1 imported successfully
-...
-=== IMPORT COMPLETE ===
-✅ Successfully imported: 4047 records
-❌ Errors: 0
-```
+Imports in batches of 500. Typical time: 2–3 minutes for 4,000 records.
 
 ### Step 5: Validate Import
 
-**Check Record Count:**
 ```sql
+-- Check total count
 SELECT COUNT(*) FROM reports;
-```
-Should match expected number.
 
-**Check Date Range:**
-```sql
+-- Check date range
 SELECT MIN(date), MAX(date) FROM reports;
-```
-Verify dates are reasonable.
 
-**Check Species Distribution:**
-```sql
-SELECT species.common_name, COUNT(*) 
-FROM reports 
-JOIN species ON reports.species_id = species.id 
-GROUP BY species.common_name 
-ORDER BY COUNT(*) DESC 
-LIMIT 20;
+-- Check species distribution
+SELECT s.common_name, COUNT(*) AS n
+FROM reports r JOIN species s ON r.species_id = s.id
+GROUP BY s.common_name ORDER BY n DESC LIMIT 20;
 ```
 
-**Spot Check:**
-- View 10-20 random records in admin dashboard
-- Verify species names correct
-- Check GPS coordinates on map
-- Confirm photos link to Google Drive
-
-### Common Issues
-
-**Issue: "species not found"**
-- Solution: Add missing species to species table
-- Or update mapping to use existing species
-
-**Issue: "date/time field out of range"**
-- Solution: Date format malformed in Excel
-- Python script should handle most formats
-- Manually fix problematic dates
-
-**Issue: "numeric field overflow"**
-- Solution: GPS coordinates outside valid range
-- Script sets to NULL for invalid coordinates
+Spot-check 10–20 records in the admin dashboard (map, species, photos).
 
 ---
 
@@ -630,426 +713,127 @@ LIMIT 20;
 
 ### Daily Tasks
 
-**Check Pending Reports:**
-- Login to admin dashboard
-- Review "ממתינים לאימות" count
-- Validate new submissions
-
-**Expected Volume:**
-- 0-5 reports per day (depends on season/activity)
+- Check admin dashboard for new pending reports ("ממתינים לאימות" count)
+- Validate or reject new submissions
+- Expected volume: 0–10 reports/day (higher in spring/autumn)
 
 ### Weekly Tasks
 
-**Review Rejected Reports:**
-- Check if any need reconsideration
-- Add feedback notes for reporters
+- Review rejected reports for reconsideration
+- Note unusual species or locations for scientific follow-up
 
-**Monitor Trends:**
-- Which species being reported most?
-- Any unusual sightings?
-- Geographic patterns?
+### Monthly Tasks (1st of each month)
 
-### Monthly Tasks
-
-**Backup Data:** (Critical!)
-- Export CSV
-- Save locally + cloud
-- Verify backup file opens correctly
-
-**Check Database Size:**
-- Supabase → Database → Usage
-- Current: ~100MB
-- Free tier limit: 500MB
-- Alert at: 400MB
-
-**Review Admin Users:**
-- Remove inactive admins
-- Update passwords if needed
-
-**Test Form:**
-- Submit test sighting
-- Verify photos upload
-- Check notification emails (if implemented)
+- [ ] Export all data to CSV and save backup
+- [ ] Export species table as CSV
+- [ ] Check database size: Supabase → Database → Usage (alert at 400MB; free tier limit 500MB)
+- [ ] Review admin user list — remove inactive accounts
+- [ ] Test form submission (submit a test report, then delete it)
 
 ### Quarterly Tasks
 
-**Species List Review:**
-- Any new species to add?
-- Taxonomy changes?
-- Update scientific names if needed
-
-**Data Quality Check:**
-- Run validation queries
-- Check for duplicate reports
-- Verify GPS accuracy
-
-**Performance Review:**
-- Website load time
-- Dashboard responsiveness
-- Export speed
+- Review species list for taxonomy updates
+- Check for duplicate reports (see SQL snippets)
+- Verify GeoJSON distribution data is current
+- Performance review: page load time, export speed
 
 ### Monitoring Checklist
 
 ```
 [ ] Website is online (herp-israel-form.vercel.app)
-[ ] Admin dashboard loads
-[ ] Can login successfully
-[ ] Form accepts submissions
+[ ] Public page loads and shows correct stats
+[ ] Admin dashboard loads and map renders
+[ ] Can login to admin successfully
+[ ] Form accepts new submissions
 [ ] Photos upload correctly
-[ ] Map displays sightings
-[ ] Export functions work
+[ ] CSV export functions work
 [ ] Database size under 400MB
-[ ] Recent backup exists
-[ ] All admins have access
+[ ] Recent backup exists (< 31 days old)
+[ ] All known admins can log in
 ```
 
 ---
 
 ## Technical Reference
 
-### Database Connection
+### URLs
+
+| Resource | URL |
+|----------|-----|
+| Public form | https://herp-israel-form.vercel.app |
+| Public page | https://herp-israel-form.vercel.app/public.html |
+| Admin dashboard | https://herp-israel-form.vercel.app/admin.html |
+| Supabase project | https://supabase.com/dashboard/project/qobayftqligpshmyweio |
+
+### Database Connection Constants
 
 **Supabase URL:**
 ```
 https://qobayftqligpshmyweio.supabase.co
 ```
 
-**Anon Key (Public):**
+**Anon Key (safe to include in public code):**
 ```
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvYmF5ZnRxbGlncHNobXl3ZWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTEzMDcsImV4cCI6MjA4NzA4NzMwN30.u69AQLyyrXJvgBLTUO9ZpMvpd6dbqTDNj9Z_0RSctps
 ```
-(Safe to include in public code)
 
-**Service Role Key:**
-[Stored securely - never commit to GitHub]
-
-### SQL Queries
-
-**Get All Reports:**
-```sql
-SELECT 
-    r.*,
-    s.common_name,
-    s.scientific_name,
-    s.family
-FROM reports r
-LEFT JOIN species s ON r.species_id = s.id
-ORDER BY r.created_at DESC;
-```
-
-**Count by Status:**
-```sql
-SELECT status, COUNT(*) 
-FROM reports 
-GROUP BY status;
-```
-
-**Count by Species:**
-```sql
-SELECT 
-    s.common_name,
-    COUNT(r.id) as sightings
-FROM species s
-LEFT JOIN reports r ON s.id = r.species_id
-GROUP BY s.common_name
-ORDER BY sightings DESC;
-```
-
-**Reports Without GPS:**
-```sql
-SELECT * FROM reports 
-WHERE latitude IS NULL OR longitude IS NULL;
-```
-
-**Recent Sightings (Last 30 days):**
-```sql
-SELECT * FROM reports 
-WHERE date >= CURRENT_DATE - INTERVAL '30 days'
-ORDER BY date DESC;
-```
-
-**Delete Test Data:**
-```sql
--- BE CAREFUL! This deletes data permanently
-DELETE FROM reports 
-WHERE id < 100;  -- Adjust ID threshold
-```
+**Service Role Key:** Stored securely — never commit to GitHub.
 
 ### File Structure
 
 ```
 herp-israel-form/
 ├── index.html          # Public submission form
+├── public.html         # Public statistics and map page
 ├── admin.html          # Admin dashboard
-├── vercel.json         # Deployment config
-├── README.md           # This documentation
+├── herp.geojson        # Species distribution polygons (94 species)
+├── vercel.json         # Deployment config { "version": 2 }
 └── scripts/
     ├── import_legacy_data.py      # Legacy data processor
     └── import_to_supabase.js      # Database import script
 ```
 
-### Storage Configuration
+### SQL Queries
 
-**Bucket Name:** `eport-photos`
-
-**Access:** Public read, authenticated upload
-
-**Policies:**
-- Anyone can upload
-- Anyone can view
-- Files stored permanently (no auto-delete)
-
-**Max File Size:** 50MB (Supabase limit)
-
-**Accepted Formats:** JPG, PNG, GIF, WebP
-
-### API Rate Limits
-
-**Supabase Free Tier:**
-- 500MB database storage
-- 1GB file storage
-- 50,000 monthly active users
-- 500,000 read requests/month
-
-**Current Usage:**
-- Database: ~100MB
-- Storage: ~50MB
-- Users: ~5 admins
-- Requests: ~10,000/month
-
-**Monitor:** Supabase → Settings → Usage
-
-### Security
-
-**Row Level Security (RLS):**
-- Enabled on `reports` table
-- Public can INSERT
-- Only authenticated admins can UPDATE/DELETE
-- Everyone can SELECT (read)
-
-**Authentication:**
-- Email/password (Supabase Auth)
-- No self-registration (admins only)
-- Password reset via Supabase
-
-**Best Practices:**
-- Never commit service_role key to GitHub
-- Use environment variables for keys (future)
-- Regular password changes
-- Remove inactive admins
-- Monitor access logs
-
----
-
-## Troubleshooting
-
-### Website Issues
-
-**Problem: Website not loading**
-
-Solutions:
-1. Check Vercel status: https://vercel.com/status
-2. Verify deployment succeeded: Vercel dashboard
-3. Check domain DNS settings
-4. Try incognito mode (clear cache)
-
-**Problem: Changes not appearing after GitHub commit**
-
-Solutions:
-1. Wait 30-60 seconds for Vercel deployment
-2. Check Vercel dashboard → Deployments
-3. Look for deployment errors
-4. Hard refresh browser (Ctrl+Shift+R)
-
-**Problem: Form submission fails**
-
-Solutions:
-1. Check browser console (F12 → Console)
-2. Verify Supabase is online
-3. Check RLS policies in Supabase
-4. Ensure species_id is valid
-5. Verify photo size < 50MB
-
-### Admin Dashboard Issues
-
-**Problem: Can't login**
-
-Solutions:
-1. Verify email exists in Supabase → Authentication
-2. Check password is correct
-3. Try password reset
-4. Clear browser cookies
-5. Try incognito mode
-
-**Problem: Reports not showing**
-
-Solutions:
-1. Check if logged in properly
-2. Verify RLS policies allow SELECT
-3. Check filters aren't too restrictive
-4. Try clearing filters ("נקה" button)
-5. Refresh page
-
-**Problem: Export button doesn't work**
-
-Solutions:
-1. Check browser pop-up blocker
-2. Look for errors in console (F12)
-3. Try different browser
-4. Verify still logged in
-5. Check database connectivity
-
-### Map Issues
-
-**Problem: Map shows only some pins**
-
-Solutions:
-1. Wait 10 seconds (loading all data)
-2. Check area filter isn't active
-3. Clear filters
-4. Check browser console for errors
-5. Verify records have GPS coordinates
-
-**Problem: Area selection not working**
-
-Solutions:
-1. Click "📐 בחר אזור במפה" first
-2. Make sure you click twice (start and end)
-3. Check if rectangle appears (green)
-4. Try clearing previous selection first
-5. Refresh page if stuck
-
-**Problem: Overlapping markers show wrong data**
-
-Solutions:
-1. Refresh page
-2. Clear browser cache
-3. Check database for duplicate coordinates
-4. Report bug if persists
-
-### Data Issues
-
-**Problem: Missing species in dropdown**
-
-Solutions:
-1. Check species table in Supabase
-2. Verify species has common_name
-3. Refresh form page
-4. Check for JavaScript errors
-
-**Problem: GPS coordinates wrong**
-
-Solutions:
-1. Check latitude/longitude format (decimal degrees)
-2. Verify coordinates in Israel bounds (lat 29-33.5, lng 34-36)
-3. Edit in admin dashboard or Supabase directly
-4. Consider setting to NULL if invalid
-
-**Problem: Photos not displaying**
-
-Solutions:
-1. Verify Google Drive link is public
-2. Check link format in database
-3. Test link in browser directly
-4. Ensure storage bucket policy allows read
-5. Check if file was deleted from Drive
-
-### Database Issues
-
-**Problem: Approaching 500MB limit**
-
-Solutions:
-1. Check what's using space: Supabase → Database → Usage
-2. Delete old test data
-3. Compress/optimize if possible
-4. Upgrade to Pro plan ($25/month for 8GB)
-
-**Problem: Queries timing out**
-
-Solutions:
-1. Add indexes to frequently queried columns
-2. Reduce data fetched (use pagination)
-3. Check for long-running queries
-4. Optimize SQL queries
-5. Consider upgrading plan
-
-**Problem: Data disappeared**
-
-Solutions:
-1. Check if RLS policies changed
-2. Verify logged in with correct user
-3. Check filters aren't hiding data
-4. Restore from backup CSV
-5. Contact Supabase support
-
-### Import Issues
-
-**Problem: Species not found during import**
-
-Solutions:
-1. Check species name spelling
-2. Verify species exists in database
-3. Update species mapping
-4. Add missing species first
-5. Use "לא מזוהה" as fallback
-
-**Problem: Date parsing errors**
-
-Solutions:
-1. Check date format in Excel (YYYY-MM-DD preferred)
-2. Fix malformed dates manually
-3. Update Python script date parsing
-4. Skip records with invalid dates
-
-**Problem: Import script fails**
-
-Solutions:
-1. Verify Node.js installed
-2. Check npm packages installed
-3. Verify service_role key is correct
-4. Check network connection
-5. Look at error message details
-
-### Getting Help
-
-**If you can't solve an issue:**
-
-1. **Check documentation** (this guide)
-2. **Search error message** on Google
-3. **Ask Claude AI** (upload this README + describe issue)
-4. **Supabase Support:** https://supabase.com/support
-5. **Vercel Support:** https://vercel.com/support
-
-**Before asking for help, collect:**
-- Error messages (exact text)
-- Screenshots
-- Browser console logs (F12 → Console)
-- What you were trying to do
-- What happened instead
-
----
-
-## Appendix
-
-### Glossary
-
-**Terms:**
-- **Supabase:** Backend-as-a-Service (database + auth + storage)
-- **Vercel:** Static site hosting with auto-deployment
-- **RLS:** Row Level Security (database access control)
-- **PostgreSQL:** Open-source relational database
-- **CSV:** Comma-Separated Values (spreadsheet format)
-- **API:** Application Programming Interface
-- **JSON:** JavaScript Object Notation (data format)
-
-### Useful SQL Snippets
-
-**Backup species table:**
+**All reports with species names:**
 ```sql
-SELECT * FROM species ORDER BY common_name;
+SELECT r.*, s.common_name, s.scientific_name, s.family
+FROM reports r
+LEFT JOIN species s ON r.species_id = s.id
+ORDER BY r.created_at DESC;
 ```
 
-**Find duplicates:**
+**Count by status:**
+```sql
+SELECT status, COUNT(*) FROM reports GROUP BY status;
+```
+
+**Count by species:**
+```sql
+SELECT s.common_name, COUNT(r.id) AS sightings
+FROM species s LEFT JOIN reports r ON s.id = r.species_id
+GROUP BY s.common_name ORDER BY sightings DESC;
+```
+
+**Reports without GPS:**
+```sql
+SELECT * FROM reports WHERE latitude IS NULL OR longitude IS NULL;
+```
+
+**Recent sightings (last 30 days):**
+```sql
+SELECT * FROM reports
+WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+ORDER BY date DESC;
+```
+
+**Monthly report counts:**
+```sql
+SELECT DATE_TRUNC('month', date) AS month, COUNT(*) AS n
+FROM reports GROUP BY month ORDER BY month DESC;
+```
+
+**Find duplicate reports:**
 ```sql
 SELECT full_name, date, species_id, COUNT(*)
 FROM reports
@@ -1057,28 +841,166 @@ GROUP BY full_name, date, species_id
 HAVING COUNT(*) > 1;
 ```
 
-**Monthly report counts:**
+**Backup species table:**
 ```sql
-SELECT 
-    DATE_TRUNC('month', date) as month,
-    COUNT(*) as reports
-FROM reports
-GROUP BY month
-ORDER BY month DESC;
+SELECT * FROM species ORDER BY common_name;
 ```
 
-### Contact Information
+**Delete test data (careful!):**
+```sql
+-- Adjust the ID threshold before running
+DELETE FROM reports WHERE id < 100;
+```
 
-**Project Maintainer:** Aram Aviram  
-**Email:** aram.aviram@gmail.com
+### API Rate Limits (Supabase Free Tier)
 
-**For Technical Support:**
-- Upload this README to Claude AI
-- Describe your issue
-- Include error messages
+| Resource | Limit | Current Usage |
+|----------|-------|--------------|
+| Database storage | 500 MB | ~100 MB |
+| File storage | 1 GB | ~50 MB |
+| Monthly active users | 50,000 | ~5 admins |
+| Read requests/month | 500,000 | ~10,000 |
+
+Monitor at: Supabase → Settings → Usage
 
 ---
 
-**End of Comprehensive Guide**
+## Troubleshooting
 
-*For quick reference, see README_Quick_Reference.md*
+### Login Issues
+
+**Can't login to admin:**
+1. Verify email exists in Supabase → Authentication → Users
+2. Check password
+3. Clear browser cookies / try incognito
+4. Try Ctrl+Shift+R to hard-refresh
+
+**After using admin, public form gives errors:**
+- Always click "התנתק" before testing the public form in the same browser session
+
+### Map Issues
+
+**Admin map not showing all pins:**
+1. Wait 10–15 seconds (loading all records)
+2. Check that no area filter is active
+3. Clear all filters
+4. Verify records have GPS coordinates
+
+**Public page heatmap not loading:**
+1. Check browser console for errors (F12)
+2. Verify `public_heatmap_grid` view exists in Supabase
+3. Check RLS policy allows anonymous SELECT on that view
+
+**Distribution polygon not showing:**
+1. Check that `/herp.geojson` is accessible (open it directly in browser)
+2. Verify the selected species has a two-word scientific name
+3. Check browser console for `[distribution]` log messages
+4. The species' scientific name must match a `binomial` property in the GeoJSON
+
+**Area selection not working:**
+1. Click "📐 בחר אזור במפה" first
+2. Click once to start, then click again to finish (two clicks, not click-drag)
+3. A green rectangle should appear
+4. If stuck, refresh the page
+
+### Form Issues
+
+**Form not submitting:**
+1. Check all required fields (*) are filled
+2. Open browser console (F12) for error details
+3. Check Supabase is online: https://supabase.com/status
+4. Verify photo file size is reasonable
+
+**Species not in dropdown:**
+1. Check species table in Supabase
+2. Verify `common_name` is not null
+3. Refresh the form page
+
+### Admin Issues
+
+**Edit not saving:**
+1. Check `TEST_MODE` is set to `false` in admin.html
+2. Check browser console for errors
+3. Verify you are still logged in (session may have expired)
+
+**Export not working:**
+1. Check browser pop-up blocker (CSV download uses a blob URL)
+2. Try a different browser
+3. Verify still logged in
+
+**Reports not showing:**
+1. Check that no filters are overly restrictive
+2. Click "נקה" to clear all filters
+3. Refresh page
+
+### Species Card Issues
+
+**Photo not showing:**
+1. Verify `photo_url` in the species table is a valid, publicly accessible URL
+2. Test the URL directly in a browser
+
+**Distribution polygon not appearing:**
+1. See "Distribution polygon not showing" under Map Issues above
+2. Only 94 species have polygons — some species may genuinely not have IUCN distribution data
+
+### Database Issues
+
+**Approaching 500MB limit:**
+1. Supabase → Database → Usage to identify what uses space
+2. Delete old test records
+3. Upgrade to Supabase Pro ($25/month → 8GB)
+
+**Data seems missing:**
+1. Check active filters in admin dashboard
+2. Verify RLS policies are intact
+3. Restore from most recent CSV backup if needed
+
+### Getting Help
+
+1. Check this documentation
+2. Search the error message on Google / Supabase docs
+3. Upload this README + relevant HTML file to Claude and describe the issue with browser console output (F12 → Console)
+4. Supabase support: https://supabase.com/support
+5. Vercel support: https://vercel.com/support
+
+**Before asking for help, collect:**
+- Exact error text
+- Browser console log (F12 → Console tab)
+- Screenshot of the issue
+- What you were trying to do
+
+---
+
+## Appendix
+
+### Glossary
+
+| Term | Meaning |
+|------|---------|
+| Supabase | Backend-as-a-Service: database + auth + storage |
+| Vercel | Static site hosting with GitHub auto-deploy |
+| RLS | Row Level Security — Supabase's per-row access control |
+| PostgreSQL | The relational database underlying Supabase |
+| GeoJSON | Geographic data format used for distribution polygons |
+| IUCN | International Union for Conservation of Nature — source of Red List and distribution data |
+| Heatmap | Grid-based density visualization of sighting locations |
+| `public_reports_safe` | Database view exposing safe (non-PII) report data to anonymous users |
+| `public_heatmap_grid` | Database view with pre-aggregated grid cell counts for the heatmap |
+| TEST_MODE | Admin dashboard flag that disables real database writes during testing |
+| `updated_by` / `updated_at` | Audit columns written when an admin edits a report |
+
+### Contact
+
+**Project Maintainer:** Aram Aviram
+**Email:** aram.aviram@gmail.com
+
+**For technical support:**
+- Upload this README + relevant HTML file to Claude AI
+- Include browser console output (F12 → Console)
+- Describe the issue and what you expected to happen
+
+---
+
+*For quick day-to-day reference, see README_Quick_Reference.md*
+
+**End of Comprehensive Guide**

@@ -1,7 +1,7 @@
 # Herp Israel Project - Quick Reference
 
-**Wildlife Reporting System for Israeli Reptiles & Amphibians**  
-Last Updated: February 2026
+**Wildlife Reporting System for Israeli Reptiles & Amphibians**
+Last Updated: March 2026
 
 ---
 
@@ -10,8 +10,9 @@ Last Updated: February 2026
 | Service | URL | Purpose |
 |---------|-----|---------|
 | **Public Form** | https://herp-israel-form.vercel.app | Submit sightings |
-| **Admin Dashboard** | https://herp-israel-form.vercel.app/admin.html | Manage reports |
-| **Supabase Console** | https://supabase.com | Database management |
+| **Public Page** | https://herp-israel-form.vercel.app/public.html | Stats, map, species cards |
+| **Admin Dashboard** | https://herp-israel-form.vercel.app/admin.html | Validate & edit reports |
+| **Supabase Console** | https://supabase.com/dashboard/project/qobayftqligpshmyweio | Database management |
 | **Vercel Dashboard** | https://vercel.com | Website deployment |
 | **GitHub Repository** | https://github.com/[username]/herp-israel-form | Source code |
 
@@ -22,7 +23,7 @@ Last Updated: February 2026
 ### Supabase (Database)
 - **Project:** herp-israel
 - **Project ID:** qobayftqligpshmyweio
-- **Login:** [Your email]
+- **Login:** aram.aviram@gmail.com
 
 ### Vercel (Website Hosting)
 - **Login:** Via GitHub authentication
@@ -30,7 +31,7 @@ Last Updated: February 2026
 
 ### GitHub (Code Storage)
 - **Repository:** herp-israel-form
-- **Login:** [Your GitHub credentials]
+- **Edit files:** Via GitHub web interface (no local Git)
 
 ### Admin Access
 - **URL:** /admin.html
@@ -42,15 +43,22 @@ Last Updated: February 2026
 
 ### View New Reports
 1. Login to admin dashboard
-2. Check "ממתינים לאימות" count
+2. Check "ממתינים לאימות" count in statistics cards
 3. Review pending submissions
 
 ### Validate Reports
-1. Click "צפה" on report
+1. Click "צפה" on a report row
 2. Review photo and details
 3. Verify species identification
 4. Click "אמת" (validate) or "דחה" (reject)
-5. Add notes if needed
+5. Add validation notes if useful
+
+### Edit a Report (full edit)
+1. Click "צפה" on a report row
+2. Click "✏️ ערוך דיווח" (top right of modal)
+3. Edit any fields including GPS on the mini-map
+4. Click "שמור שינויים"
+5. Check that `TEST_MODE = false` in code if saves aren't working
 
 ### Export Data
 - **All records:** Click "ייצא הכל ל-CSV"
@@ -59,10 +67,10 @@ Last Updated: February 2026
 
 ---
 
-## 🗺️ Using the Map
+## 🗺️ Using the Admin Map
 
 ### View All Sightings
-- Map shows all records with GPS coordinates
+- Map shows all records with GPS coordinates (not paginated)
 - Color coded by status:
   - 🟠 Orange = Pending
   - 🟢 Green = Validated
@@ -70,44 +78,58 @@ Last Updated: February 2026
 
 ### Select Area
 1. Click "📐 בחר אזור במפה"
-2. Click once to start
-3. Move mouse and click again to finish
+2. Click once to anchor start corner
+3. Click again to finish the rectangle
 4. Table and map filter to selected area
 5. Click "✖ נקה בחירת אזור" to clear
 
 ### Overlapping Markers
-- Click pin → Shows all reports at that location
+- Click pin → shows all reports at that location
 - Scroll through list
-- Click "צפה בדיווח" to view details
+- Click "צפה בדיווח" to open detail modal
 
 ---
 
-## 🔍 Filtering Reports
+## 🌍 Public Page Features
+
+### Info Boxes (top)
+- Total sightings, validated sightings, distinct species, last-7-days species
+
+### Map
+- Species dropdown → filters heatmap to that species
+- Distribution polygon (from IUCN data via `herp.geojson`) appears below heatmap
+- Clear selection to return to full-dataset heatmap
+
+### Species Card
+Shows: photo, Hebrew + scientific name, venom/poison badge (with SVG icons), activity time, size, diet, description, IUCN status, sighting count
+
+### Charts
+- Monthly seasonality bar chart
+- Top 10 reported species
+- Family breakdown
+
+---
+
+## 🔍 Filtering Reports (Admin)
 
 ### Available Filters
 - **Status:** Pending / Validated / Rejected
 - **Family:** Taxonomic family
 - **Species:** Specific species
 - **Date Range:** From → To
-- **Map Area:** Draw on map
+- **Map Area:** Draw rectangle on map
 
-### Apply Filters
-1. Select filter values
-2. Click "החל סינון"
-3. Both table and map update
-
-### Clear Filters
-- Click "נקה" button
-- Resets all filters and map selection
+### Apply / Clear
+- "החל סינון" → applies filters to both table and map
+- "נקה" → resets all filters
 
 ---
 
 ## 📄 Pagination
 
-- **Records per page:** 100
-- **Navigation:** Previous/Next buttons at bottom
-- **Total shown:** "מציג 1-100 מתוך 6110 דיווחים"
-- **Map:** Always shows ALL records (not paginated)
+- 100 records per page
+- Navigation: Previous/Next at bottom
+- Map always shows ALL records (not just current page)
 
 ---
 
@@ -115,21 +137,28 @@ Last Updated: February 2026
 
 ### Add New Admin User
 1. Supabase → Authentication → Users
-2. Click "Add User" → "Create new user"
+2. "Add User" → "Create new user"
 3. Enter email and password
 4. ✅ Check "Auto Confirm User"
-5. Click "Create user"
-6. Share credentials with new admin
+5. Share credentials manually (no email sent)
 
 ### Update Species List
 1. Supabase → Table Editor → species
 2. Add/edit rows directly
-3. Changes appear immediately in form
+3. Changes appear immediately in form and public page
+
+### Add Species Photo
+1. Get a publicly accessible image URL
+2. Supabase → Table Editor → species → find species row
+3. Paste URL into `photo_url` column
+
+### Update Distribution Data (GeoJSON)
+1. Replace `herp.geojson` in GitHub repository
+2. Vercel auto-deploys; public page picks it up on next load
 
 ### Check Database Size
-1. Supabase → Database → Usage
-2. Monitor: Should stay under 500MB (free tier)
-3. Upgrade to Pro when reaching 400MB
+1. Supabase → Settings → Usage
+2. Alert when approaching 400MB (free tier limit: 500MB)
 
 ---
 
@@ -137,60 +166,79 @@ Last Updated: February 2026
 
 **Do this on the 1st of every month:**
 
-- [ ] Export all data to CSV
-- [ ] Save CSV to computer + external backup
-- [ ] Check database size in Supabase
+- [ ] Admin dashboard → "ייצא הכל ל-CSV" → save as `reports_backup_YYYY-MM.csv`
+- [ ] Supabase SQL Editor → `SELECT * FROM species ORDER BY common_name;` → export CSV
+- [ ] Save both files locally + Google Drive
+- [ ] Check database size in Supabase → Settings → Usage
 - [ ] Verify website is online
 - [ ] Test form submission
+
+---
+
+## ⚠️ TEST_MODE (Admin Code)
+
+There is a flag near the top of `admin.html`:
+
+```javascript
+const TEST_MODE = false;
+```
+
+- **`false` (default/production):** Edits save to the database normally
+- **`true`:** Edit saves are blocked — shows a yellow warning and logs to console only
+
+If edits are not saving, check this flag is set to `false`.
 
 ---
 
 ## 🚨 Troubleshooting
 
 ### Can't Login to Admin
-- Check email/password in Supabase → Authentication
-- Clear browser cache (Ctrl+Shift+R)
-- Try incognito mode
-- Logout and login again
+- Verify email in Supabase → Authentication
+- Clear browser cache (Ctrl+Shift+R) or try incognito
+
+### Public Form Errors After Using Admin
+- Click "התנתק" in admin before using the public form in the same browser
 
 ### Map Not Loading
-- Wait 10 seconds (loading 6000+ pins)
+- Wait 10–15 seconds (loading many records)
 - Check internet connection
 - Refresh page (Ctrl+Shift+R)
+
+### Distribution Polygon Not Showing
+- Species must have a two-word scientific name matching `herp.geojson`
+- Check browser console for `[distribution]` logs (F12)
+- Not all species have IUCN polygons
 
 ### Export Not Working
 - Check browser pop-up blocker
 - Try different browser
-- Verify you're logged in
+- Verify logged in
 
 ### Form Not Submitting
 - Check all required fields (*) are filled
-- Verify photo size < 10MB
-- Try without photo first
-- Check browser console for errors (F12)
-
----
-
-## 📞 Emergency Contacts
-
-**Technical Issues:**
-- Supabase Support: https://supabase.com/support
-- Vercel Support: https://vercel.com/support
-
-**Database Issues:**
-- Can always export CSV and rebuild if needed
-- Photos stored in Google Drive (safe)
+- Open browser console for errors (F12)
+- Check Supabase status
 
 ---
 
 ## 🔐 Security Best Practices
 
-- ✅ Never share service_role key
+- ✅ Never share the `service_role` key
+- ✅ Never commit the `service_role` key to GitHub (use only `anon` key in code)
 - ✅ Use different passwords for each service
-- ✅ Don't share admin credentials publicly
 - ✅ Logout when done on shared computers
 - ✅ Regular backups (monthly minimum)
+- ✅ Remove inactive admin accounts
 
 ---
 
-**For detailed procedures, see Comprehensive Guide**
+## 📞 Support
+
+**Technical Issues:**
+- Supabase: https://supabase.com/support
+- Vercel: https://vercel.com/support
+- Claude AI: Upload README + relevant HTML file + describe the issue + include browser console output (F12)
+
+---
+
+**For full procedures and schema details, see README_Comprehensive.md**
