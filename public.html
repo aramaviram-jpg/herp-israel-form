@@ -178,6 +178,11 @@ header{
 .sp-placeholder{color:var(--muted);font-size:0.85rem;line-height:1.7}
 .sp-photo{width:100%;height:190px;overflow:hidden;border-radius:6px;margin-bottom:0.85rem;background:var(--bg3);position:relative}
 .sp-photo img{width:100%;height:100%;object-fit:cover}
+.sp-photo img[data-lightbox]{cursor:zoom-in}
+#sp-lightbox{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.82);align-items:center;justify-content:center}
+#sp-lightbox.open{display:flex}
+#sp-lightbox img{max-width:92vw;max-height:88vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);object-fit:contain}
+#sp-lightbox-close{position:absolute;top:1rem;left:1rem;background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:1.6rem;line-height:1;width:2.2rem;height:2.2rem;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .sp-name-he{font-size:1.25rem;font-weight:700;color:var(--text);margin-bottom:0.15rem}
 .sp-name-sci{font-style:italic;font-size:0.78rem;color:var(--amber);margin-bottom:0.7rem}
 .sp-badges{display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.8rem}
@@ -673,7 +678,7 @@ function renderSpeciesCard(d, count) {
 
   // Photo
   const photoHtml = d.photo
-    ? `<div class="sp-photo"><img src="${d.photo}" alt="${d.he}" loading="lazy" onerror="this.parentElement.style.display='none'">${consBadge}</div>`
+    ? `<div class="sp-photo"><img src="${d.photo}" alt="${d.he}" loading="lazy" data-lightbox onerror="this.removeAttribute('data-lightbox');this.parentElement.style.display='none'">${consBadge}</div>`
     : (consBadge ? `<div class="sp-photo" style="height:auto;padding:0.5rem">${consBadge}</div>` : '');
 
   // Diet & description
@@ -861,6 +866,41 @@ loadSeasonal();
 loadTopSpecies();
 loadFamilyBreakdown();
 loadAllSpeciesHeatmap();
+</script>
+
+<!-- Species photo lightbox -->
+<div id="sp-lightbox" role="dialog" aria-modal="true" aria-label="תמונה מוגדלת">
+  <button id="sp-lightbox-close" aria-label="סגור">✕</button>
+  <img id="sp-lightbox-img" src="" alt="">
+</div>
+<script>
+(function(){
+  const lb  = document.getElementById('sp-lightbox');
+  const img = document.getElementById('sp-lightbox-img');
+  const btn = document.getElementById('sp-lightbox-close');
+
+  function open(src, alt) {
+    img.src = src;
+    img.alt = alt || '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function close() {
+    lb.classList.remove('open');
+    img.src = '';
+    document.body.style.overflow = '';
+  }
+
+  // Click on any photo with data-lightbox
+  document.addEventListener('click', function(e) {
+    const t = e.target.closest('img[data-lightbox]');
+    if (t) open(t.src, t.alt);
+  });
+
+  btn.addEventListener('click', close);
+  lb.addEventListener('click', function(e){ if (e.target === lb) close(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+})();
 </script>
 </body>
 </html>
