@@ -798,24 +798,43 @@ async function loadTopSpecies() {
 }
 
 // ── FAMILY BREAKDOWN ──────────────────────────────────────────
-// Map family names to Hebrew group labels
+// Map family names to display labels and colors
+// Keys must match exactly the `family` values in the species table
 const FAMILY_GROUPS = {
-  'Viperidae': { label: 'צפעונים', color: '#8a4a2a' },
-  'Colubridae': { label: 'נחשי העולם הישן', color: '#5a7a2a' },
-  'Elapidae': { label: 'אלפידים', color: '#2a5a4a' },
-  'Typhlopidae': { label: 'עיוורונים', color: '#6a5a3a' },
-  'Lacertidae': { label: 'לטאות', color: '#7a6a2a' },
-  'Gekkonidae': { label: 'גקונים', color: '#4a6a7a' },
-  'Agamidae': { label: 'אגמות', color: '#7a4a6a' },
-  'Scincidae': { label: 'שינקיים', color: '#3a6a5a' },
-  'Chamaeleonidae': { label: 'זיקיות', color: '#5a4a7a' },
-  'Bufonidae': { label: 'קרפדות', color: '#6a3a4a' },
-  'Ranidae': { label: 'צפרדעים', color: '#3a5a6a' },
-  'Hylidae': { label: 'אילנאים', color: '#4a6a3a' },
-  'Salamandridae': { label: 'סלמנדרות', color: '#5a3a6a' },
-  'Testudinidae': { label: 'צבי יבשה', color: '#7a5a2a' },
-  'Emydidae': { label: 'צבי מים', color: '#2a5a7a' },
-  'Trionychidae': { label: 'צבי בריכה', color: '#4a7a5a' },
+  // Snakes
+  'זעמניים':    { label: 'זעמניים',    color: '#5a7a2a' },
+  'חומטיים':    { label: 'חומטיים',    color: '#3a6a5a' },
+  'צפעוניים':   { label: 'צפעוניים',   color: '#8a4a2a' },
+  'שרפיים':     { label: 'שרפיים',     color: '#2a5a4a' },
+  'נחשיליים':   { label: 'נחשיליים',   color: '#6a5a3a' },
+  'נימוניים':   { label: 'נימוניים',   color: '#4a5a3a' },
+  'חנקיים':     { label: 'חנקיים',     color: '#5a4a3a' },
+  'מחרוזניים':  { label: 'מחרוזניים',  color: '#6a4a2a' },
+  'פתניים':     { label: 'פתניים',     color: '#7a5a3a' },
+  // Lizards
+  'לטאיים':     { label: 'לטאיים',     color: '#7a6a2a' },
+  'שממיתיים':   { label: 'שממיתיים',   color: '#4a6a7a' },
+  'חרדוניים':   { label: 'חרדוניים',   color: '#7a4a6a' },
+  'זיקיתיים':   { label: 'זיקיתיים',   color: '#5a4a7a' },
+  'ארבע-קויים': { label: 'ארבע-קויים', color: '#6a5a7a' },
+  'מניפניתיים': { label: 'מניפניתיים', color: '#5a5a7a' },
+  'חפריתיים':   { label: 'חפריתיים',   color: '#4a5a6a' },
+  'אנוליסיים':  { label: 'אנוליסיים',  color: '#5a6a5a' },
+  'כוחיים':     { label: 'כוחיים',     color: '#6a6a4a' },
+  'קמטניים':    { label: 'קמטניים',    color: '#5a6a4a' },
+  'עגולשוניים': { label: 'עגולשוניים', color: '#4a6a5a' },
+  // Amphibians
+  'קרפדיים':    { label: 'קרפדיים',    color: '#6a3a4a' },
+  'צפרדעיים':   { label: 'צפרדעיים',   color: '#3a5a6a' },
+  'אילניתיים':  { label: 'אילניתיים',  color: '#4a6a3a' },
+  'סלמנדריים':  { label: 'סלמנדריים',  color: '#5a3a6a' },
+  // Turtles
+  'צבי-יבשה':   { label: 'צבי יבשה',   color: '#7a5a2a' },
+  'צבי-ים':     { label: 'צבי ים',     color: '#2a5a7a' },
+  'צבי-אגמים':  { label: 'צבי אגמים',  color: '#4a7a5a' },
+  'צבי-בצות':   { label: 'צבי בצות',   color: '#3a6a6a' },
+  'צבים-גלדיים':{ label: 'צבים גלדיים',color: '#5a7a6a' },
+  'צבים-רכים':  { label: 'צבים רכים',  color: '#4a7a6a' },
 };
 
 async function loadFamilyBreakdown() {
@@ -891,7 +910,6 @@ loadAllSpeciesHeatmap();
     document.body.style.overflow = '';
   }
 
-  // Click on any photo with data-lightbox
   document.addEventListener('click', function(e) {
     const t = e.target.closest('img[data-lightbox]');
     if (t) open(t.src, t.alt);
