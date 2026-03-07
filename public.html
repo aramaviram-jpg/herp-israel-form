@@ -753,59 +753,60 @@ async function loadSeasonal() {
   // Normalize each series to % of its annual total
   const repTotal = repCounts.reduce((a,b)=>a+b,0) || 1;
   const ampTotal = ampCounts.reduce((a,b)=>a+b,0) || 1;
-  const repNorm  = repCounts.map(v => v / repTotal);
-  const ampNorm  = ampCounts.map(v => v / ampTotal);
+  const repNorm = repCounts.map(v => v / repTotal);
+  const ampNorm = ampCounts.map(v => v / ampTotal);
 
   const svg = document.getElementById('seasonal-chart');
   const W = 420, H = 160, padL = 28, padR = 8, padT = 12, padB = 22;
   const chartW = W - padL - padR;
   const chartH = H - padT - padB;
+  const CAP = 0.30; // Y axis capped at 30%
 
-  const xPos = i => padL + (i / 11) * chartW;
-  const yPos = v => padT + chartH - v * chartH;
+  const yPos = v => padT + chartH - Math.min(v, CAP) / CAP * chartH;
 
-  const buildPath = norm => norm.map((v,i) => `${i===0?'M':'L'}${xPos(i).toFixed(1)},${yPos(v).toFixed(1)}`).join(' ');
+  // Group slot width, two bars per month
+  const slotW = chartW / 12;
+  const barW  = slotW * 0.38;
+  const xRep  = i => padL + i * slotW + slotW * 0.06;
+  const xAmp  = i => padL + i * slotW + slotW * 0.06 + barW + 1;
 
   let html = '';
 
-  // Gridlines at 10% and 20%
-  [0.1, 0.2].forEach(v => {
+  // Gridlines at 10%, 20%, 30%
+  [0.1, 0.2, 0.3].forEach(v => {
     const y = yPos(v).toFixed(1);
     html += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>`;
   });
 
   // Y axis labels
+  html += `<text class="chart-axis-label" x="${padL-3}" y="${yPos(0.3)+3}" text-anchor="end">30%</text>`;
   html += `<text class="chart-axis-label" x="${padL-3}" y="${yPos(0.2)+3}" text-anchor="end">20%</text>`;
   html += `<text class="chart-axis-label" x="${padL-3}" y="${yPos(0.1)+3}" text-anchor="end">10%</text>`;
 
-  // Area fills
-  const repPath = buildPath(repNorm);
-  const ampPath = buildPath(ampNorm);
-  const baseY = (padT + chartH).toFixed(1);
-  html += `<path d="${repPath} L${xPos(11).toFixed(1)},${baseY} L${xPos(0).toFixed(1)},${baseY} Z" fill="#b87018" opacity="0.08"/>`;
-  html += `<path d="${ampPath} L${xPos(11).toFixed(1)},${baseY} L${xPos(0).toFixed(1)},${baseY} Z" fill="#2a7a6a" opacity="0.08"/>`;
+  const baseY = padT + chartH;
 
-  // Lines
-  html += `<path d="${repPath}" fill="none" stroke="#b87018" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
-  html += `<path d="${ampPath}" fill="none" stroke="#2a7a6a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
-
-  // Dots + tooltip targets
-  repNorm.forEach((v,i) => {
-    const x = xPos(i).toFixed(1), y = yPos(v).toFixed(1);
-    html += `<circle cx="${x}" cy="${y}" r="3.5" fill="#b87018"/>`;
-    html += `<circle cx="${x}" cy="${y}" r="10" fill="transparent">
-      <title>${MONTHS_HE[i]}
-🦎 ${(repNorm[i]*100).toFixed(1)}% (${repCounts[i].toLocaleString('he-IL')} תצפיות)
-🐸 ${(ampNorm[i]*100).toFixed(1)}% (${ampCounts[i].toLocaleString('he-IL')} תצפיות)</title></circle>`;
+  // Bars
+  repNorm.forEach((v, i) => {
+    const bh = Math.min(v, CAP) / CAP * chartH;
+    const x  = xRep(i).toFixed(1);
+    const y  = (baseY - bh).toFixed(1);
+    html += `<rect x="${x}" y="${y}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" fill="#b87018" opacity="0.85" rx="1">
+      <title>${MONTHS_HE[i]} — זוחלים
+${(v*100).toFixed(1)}% (${repCounts[i].toLocaleString('he-IL')} תצפיות)</title></rect>`;
   });
-  ampNorm.forEach((v,i) => {
-    const x = xPos(i).toFixed(1), y = yPos(v).toFixed(1);
-    html += `<circle cx="${x}" cy="${y}" r="3.5" fill="#2a7a6a"/>`;
+  ampNorm.forEach((v, i) => {
+    const bh = Math.min(v, CAP) / CAP * chartH;
+    const x  = xAmp(i).toFixed(1);
+    const y  = (baseY - bh).toFixed(1);
+    html += `<rect x="${x}" y="${y}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" fill="#2a7a6a" opacity="0.85" rx="1">
+      <title>${MONTHS_HE[i]} — דו-חיים
+${(v*100).toFixed(1)}% (${ampCounts[i].toLocaleString('he-IL')} תצפיות)</title></rect>`;
   });
 
-  // Month labels
-  MONTHS_HE.forEach((m,i) => {
-    html += `<text class="chart-axis-label" x="${xPos(i).toFixed(1)}" y="${H-5}" text-anchor="middle">${m}</text>`;
+  // Month labels (centred on the pair)
+  MONTHS_HE.forEach((m, i) => {
+    const cx = (padL + i * slotW + slotW / 2).toFixed(1);
+    html += `<text class="chart-axis-label" x="${cx}" y="${H-5}" text-anchor="middle">${m}</text>`;
   });
 
   svg.innerHTML = html;
