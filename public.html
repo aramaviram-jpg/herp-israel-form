@@ -191,6 +191,7 @@ header{
 .sp-badge-subvenomous{border-color:#e0b860;background:#fdf8e8;color:#7a4a10}
 .sp-badge-nonvenomous{border-color:#80c080;background:#f0fdf0;color:#206020}
 .sp-badge-poisonous{border-color:#b080d0;background:#f8f0fd;color:#5a2080}
+.sp-cons-invasive{background:#7F77DD;color:#EEEDFE;border-radius:5px;font-size:0.72rem;font-weight:600;padding:0.3rem 0.7rem;position:absolute;bottom:8px;right:8px}
 .sp-badge-day{border-color:#e8c870;background:#fdf8e8;color:#7a5a10}
 .sp-badge-night{border-color:#a0a8d0;background:#f0f0f8;color:#383870}
 .sp-badge-both{border-color:#c8b880;background:#faf4e4;color:#5a4a18}
@@ -568,7 +569,7 @@ async function loadInfoBoxes() {
 const nameToIds = {};
 
 async function loadSpeciesDropdown() {
-  const {data} = await sb.from('species').select('id,common_name,scientific_name,venom_level,activity_time,max_size_mm,diet,description,photo_url,red_list_status').order('common_name');
+  const {data} = await sb.from('species').select('id,common_name,scientific_name,venom_level,activity_time,max_size_mm,diet,description,photo_url,red_list_status,is_invasive').order('common_name');
   const sel = document.getElementById('species-select');
   if (!data) return;
 
@@ -592,6 +593,7 @@ async function loadSpeciesDropdown() {
       o.dataset.desc   = s.description     || '';
       o.dataset.photo  = s.photo_url       || '';
       o.dataset.cons   = s.red_list_status || '';
+      o.dataset.invasive = s.is_invasive ? '1' : '';
       o.textContent    = name + (s.scientific_name ? ` — ${s.scientific_name}` : '');
       sel.appendChild(o);
     }
@@ -679,11 +681,16 @@ function renderSpeciesCard(d, count) {
   const sizeBadge = sizeStr ? `<span class="sp-badge">📏 עד ${sizeStr}</span>` : '';
 
   // Conservation badge
-  const consMap = { LC:'lc', EN:'en', VU:'vu', NT:'nt', CR:'cr' };
-  const consLabels = { LC:'לא בסיכון', EN:'בסכנת הכחדה', VU:'עתידו בסכנה', NT:'קרוב לסיכון', CR:'בסכנה קריטית' };
-  const consKey = (d.cons||'').toUpperCase().trim();
-  const consBadge = consKey && consMap[consKey]
-    ? `<div class="sp-cons sp-cons-${consMap[consKey]}">${consKey} · ${consLabels[consKey]}</div>` : '';
+  let consBadge = '';
+  if (d.invasive === '1') {
+    consBadge = `<div class="sp-cons sp-cons-invasive">מין פולש</div>`;
+  } else {
+    const consMap = { LC:'lc', EN:'en', VU:'vu', NT:'nt', CR:'cr' };
+    const consLabels = { LC:'לא בסיכון', EN:'בסכנת הכחדה', VU:'עתידו בסכנה', NT:'קרוב לסיכון', CR:'בסכנה קריטית' };
+    const consKey = (d.cons||'').toUpperCase().trim();
+    if (consKey && consMap[consKey])
+      consBadge = `<div class="sp-cons sp-cons-${consMap[consKey]}">${consKey} · ${consLabels[consKey]}</div>`;
+  }
 
   // Photo
   const photoHtml = d.photo
