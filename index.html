@@ -478,7 +478,8 @@
                     <label for="photos" class="file-upload-label">
                         📷 לחצו להעלאת תמונות
                     </label>
-                    <p class="help-text">ניתן להעלות מספר תמונות</p>
+                    <p class="help-text">ניתן להעלות עד 3 תמונות. נא לא להעלות תמונות נוספות, אם אין בהן כדי להוסיף פרטים לצורך זיהוי</p>
+                    <p id="photoCounter" style="font-size:13px; color:#667eea; margin-top:4px;">0/3 תמונות נבחרו</p>
                 </div>
                 <div id="fileList" class="file-list"></div>
             </div>
@@ -679,7 +680,15 @@
         
         // File upload handling
         document.getElementById('photos').addEventListener('change', (e) => {
-            selectedFiles = Array.from(e.target.files);
+            selectedFiles = Array.from(e.target.files).slice(0, 3);
+            const photoInput = document.getElementById('photos');
+            const counter = document.getElementById('photoCounter');
+            counter.textContent = `${selectedFiles.length}/3 תמונות נבחרו`;
+            if (selectedFiles.length >= 3) {
+                photoInput.disabled = true;
+            } else {
+                photoInput.disabled = false;
+            }
             displayFileList();
         });
         
