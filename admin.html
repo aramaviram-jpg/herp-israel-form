@@ -2181,7 +2181,7 @@
         async function loadSystemStats() {
             try {
                 // Live storage usage
-                const { data: storageMb, error: storageError } = await supabase.rpc('get_storage_used_mb');
+                const { data: storageMb, error: storageError } = await supabaseClient.rpc('get_storage_used_mb');
                 if (!storageError && storageMb !== null) {
                     const mb = parseFloat(storageMb);
                     const el = document.getElementById('storageUsed');
@@ -2196,7 +2196,7 @@
                 }
 
                 // Last archiving job
-                const { data: jobs, error: jobError } = await supabase
+                const { data: jobs, error: jobError } = await supabaseClient
                     .from('system_stats')
                     .select('recorded_at, job_status, records_processed')
                     .eq('job_name', 'archive-photos')
