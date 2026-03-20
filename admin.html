@@ -149,6 +149,19 @@
             font-weight: bold;
             color: #667eea;
         }
+
+        .stat-card .number.storage-green { color: #27ae60; }
+        .stat-card .number.storage-amber { color: #f39c12; }
+        .stat-card .number.storage-red { color: #e74c3c; }
+
+        .stat-card .job-status {
+            font-size: 13px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .stat-card .job-status .job-success { color: #27ae60; font-weight: 600; }
+        .stat-card .job-status .job-partial { color: #f39c12; font-weight: 600; }
         
         .filters {
             background: white;
@@ -780,6 +793,15 @@
                     <h3>לא מזוהים</h3>
                     <div class="number" id="unidentifiedReports">0</div>
                 </div>
+                <div class="stat-card">
+                    <h3>אחסון תמונות</h3>
+                    <div class="number" id="storageUsed">...</div>
+                </div>
+                <div class="stat-card">
+                    <h3>גיבוי אחרון</h3>
+                    <div class="number" id="lastJobTime" style="font-size:16px;">...</div>
+                    <div class="job-status" id="lastJobStatus"></div>
+                </div>
             </div>
             
             <!-- Filters -->
@@ -1144,6 +1166,7 @@
             
             await loadSpecies();
             await loadReports();
+            await loadSystemStats();
         }
         
         // Load Species
@@ -2153,6 +2176,45 @@
             const unidentifiedCount = unidentifiedSpecies ? 
                 reports.filter(r => r.species_id === unidentifiedSpecies.id).length : 0;
             document.getElementById('unidentifiedReports').textContent = unidentifiedCount;
+        }
+
+        async function loadSystemStats() {
+            try {
+                // Live storage usage
+                const { data: storageMb, error: storageError } = await supabase.rpc('get_storage_used_mb');
+                if (!storageError && storageMb !== null) {
+                    const mb = parseFloat(storageMb);
+                    const el = document.getElementById('storageUsed');
+                    el.textContent = mb + ' MB';
+                    if (mb < 600) {
+                        el.className = 'number storage-green';
+                    } else if (mb < 800) {
+                        el.className = 'number storage-amber';
+                    } else {
+                        el.className = 'number storage-red';
+                    }
+                }
+
+                // Last archiving job
+                const { data: jobs, error: jobError } = await supabase
+                    .from('system_stats')
+                    .select('recorded_at, job_status, records_processed')
+                    .eq('job_name', 'archive-photos')
+                    .order('recorded_at', { ascending: false })
+                    .limit(1);
+
+                if (!jobError && jobs && jobs.length > 0) {
+                    const job = jobs[0];
+                    const date = new Date(job.recorded_at);
+                    document.getElementById('lastJobTime').textContent =
+                        date.toLocaleDateString('he-IL') + ' ' + date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+                    const statusEl = document.getElementById('lastJobStatus');
+                    const statusClass = job.job_status === 'success' ? 'job-success' : 'job-partial';
+                    statusEl.innerHTML = `<span class="${statusClass}">${job.job_status}</span> · עובדו ${job.records_processed} רשומות`;
+                }
+            } catch (err) {
+                console.error('loadSystemStats error:', err);
+            }
         }
         
         // Helper Functions
