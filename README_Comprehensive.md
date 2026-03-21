@@ -50,9 +50,11 @@ Community-driven citizen science platform for tracking reptile and amphibian sig
 | Frontend | HTML5, vanilla JavaScript, Leaflet 1.9.4 (maps) |
 | Backend | Supabase (PostgreSQL + Row Level Security) |
 | Hosting | Vercel (auto-deploys from GitHub) |
-| Photo Storage | Supabase Storage bucket (`eport-photos`) |
+| Photo Storage (active) | Supabase Storage bucket (`eport-photos`) |
+| Photo Storage (archive) | Cloudflare R2 (`herp-israel-photos`) |
 | Distribution Data | `herp.geojson` (94 species, served from repo root) |
 | Version Control | GitHub (web interface only — no local Git) |
+| Scheduled Jobs | Supabase Cron (pg_cron + pg_net) |
 
 ---
 
@@ -72,8 +74,16 @@ Community-driven citizen science platform for tracking reptile and amphibian sig
                           ┌───────────────────────┐
                           │        Supabase        │
                           │  PostgreSQL + RLS      │
-                          │  Storage (photos)      │
+                          │  Storage (active photos│
+                          │  up to ~10 days old)   │
                           │  Auth (admin users)    │
+                          └───────────┬───────────┘
+                                      │ Weekly cron job
+                                      ↓ (every Monday 2AM UTC)
+                          ┌───────────────────────┐
+                          │    Cloudflare R2       │
+                          │  Permanent photo       │
+                          │  archive (originals)   │
                           └───────────────────────┘
                                       ↑
                           ┌───────────────────────┐
@@ -287,10 +297,12 @@ All three methods write to hidden `latitude` and `longitude` fields on the form.
 
 ### Photo Upload
 
-- Multiple files accepted
+- Maximum **3 photos** per report (enforced client-side)
 - Uploaded to Supabase Storage bucket `eport-photos`
-- Public URLs stored in `photo_urls` (JSON array) on the report record
-- No hard client-side file size limit enforced (Supabase limit applies)
+- Public URLs stored in `photo_urls` (text array) on the report record
+- A counter displays how many photos have been selected (e.g. "2/3 תמונות נבחרו")
+- If more than 3 files are selected, only the first 3 are kept and a red warning is shown
+- No hard client-side file size limit enforced (Supabase platform limit applies)
 
 ### Form Submission
 
@@ -323,6 +335,8 @@ RLS policy: anonymous users can INSERT but not SELECT/UPDATE/DELETE.
 - ממתינים לאימות (Pending)
 - מאומתות (Validated)
 - נדחות (Rejected)
+- **אחסון תמונות** — live Supabase storage usage in MB, color coded green / amber / red
+- **גיבוי אחרון** — timestamp and status of the last archiving job run
 
 **Filters:**
 - Status (Pending / Validated / Rejected)
@@ -500,6 +514,9 @@ When multiple reports share the same GPS coordinates, a popup lists all of them 
 | `validation_notes` | text | Admin notes on validation |
 | `updated_by` | text | Admin email of last editor (edit workflow) |
 | `updated_at` | timestamp | Timestamp of last edit |
+| `archived` | boolean | True when photos have been moved to R2 |
+| `archived_at` | timestamp | When archiving occurred |
+| `archived_photo_keys` | text[] | R2 storage keys for original photos (e.g. `2026/report_123_1.jpg`) |
 
 **Views:**
 
@@ -521,13 +538,34 @@ When multiple reports share the same GPS coordinates, a popup lists all of them 
 
 ### Storage Configuration
 
-**Bucket name:** `eport-photos`
+**Supabase bucket name:** `eport-photos`
 
 **Access:** Public read, anonymous upload allowed
 
 **File formats accepted:** JPG, PNG, GIF, WebP
 
+**Max photos per report:** 3 (enforced client-side)
+
 **Max file size:** Supabase platform limit applies (50MB per file)
+
+**Steady state:** Photos are automatically archived to Cloudflare R2 after validation and deleted from Supabase. Supabase storage does not grow unboundedly.
+
+### Cloudflare R2 Archive Storage
+
+**Purpose:** Permanent archive of original full-resolution photos
+
+**Bucket:** `herp-israel-photos`
+
+**Public URL:** `https://pub-6d56a224016c4263ac2d6ce68334aa77.r2.dev`
+
+**File naming convention:** `{year}/report_{id}_{n}.jpg`
+Example: `2026/report_26400_1.jpg`
+
+**Access:** Public read via r2.dev URL. Files are served directly from Cloudflare's network.
+
+**Cost:** Free up to 10 GB; ~$0.015/GB/month beyond that. Projected 10-year cost under $110 total.
+
+**Manual retrieval:** To retrieve an original photo, look up `archived_photo_keys` in the `reports` table for the report ID, then browse to the Cloudflare R2 dashboard → herp-israel-photos bucket.
 
 ### GeoJSON Distribution Data
 
@@ -722,11 +760,39 @@ Spot-check 10–20 records in the admin dashboard (map, species, photos).
 - Review rejected reports for reconsideration
 - Note unusual species or locations for scientific follow-up
 
+### Photo Archiving Pipeline
+
+An automated weekly job handles photo archiving:
+
+**Schedule:** Every Monday at 2:00 AM UTC (Supabase Cron job: `archive-photos-job`)
+
+**What it does:**
+1. Finds validated reports older than 10 days with photos still in Supabase storage
+2. Uploads each photo to Cloudflare R2 as `{year}/report_{id}_{n}.jpg`
+3. Updates `photo_urls` in the `reports` table to the new R2 public URLs
+4. Deletes the originals from Supabase storage
+5. Sets `archived = true` and `archived_at` timestamp on each processed report
+6. Logs the run to the `system_stats` table
+
+**Configuration** (editable in Supabase → Table Editor → `config` table):
+- `archive_after_days` — how many days after validation before archiving (default: 10)
+- `archive_batch_size` — max records per run (default: 50)
+
+**Monitoring:** The admin dashboard shows storage usage and last job status in real time.
+
+**Manual trigger:** The job can be triggered manually by calling the `archive-photos` Edge Function directly if needed.
+
+**Records excluded from archiving:**
+- Reports with `archived = true` (already processed, Google Drive URLs, or no photos)
+- Reports with status other than "Validated"
+- Reports newer than `archive_after_days`
+
 ### Monthly Tasks (1st of each month)
 
 - [ ] Export all data to CSV and save backup
 - [ ] Export species table as CSV
-- [ ] Check database size: Supabase → Database → Usage (alert at 400MB; free tier limit 500MB)
+- [ ] Check admin dashboard storage indicator (should be green)
+- [ ] Check last archiving job status in admin dashboard
 - [ ] Review admin user list — remove inactive accounts
 - [ ] Test form submission (submit a test report, then delete it)
 
@@ -854,14 +920,25 @@ DELETE FROM reports WHERE id < 100;
 
 ### API Rate Limits (Supabase Free Tier)
 
-| Resource | Limit | Current Usage |
-|----------|-------|--------------|
-| Database storage | 500 MB | ~100 MB |
-| File storage | 1 GB | ~50 MB |
+| Resource | Limit | Notes |
+|----------|-------|-------|
+| Database storage | 500 MB | Monitor in Supabase → Settings → Usage |
+| File storage | 1 GB | Maintained at steady state by archiving pipeline |
 | Monthly active users | 50,000 | ~5 admins |
-| Read requests/month | 500,000 | ~10,000 |
+| Edge Function invocations | 500,000/month | Archiving job uses ~52/year |
 
 Monitor at: Supabase → Settings → Usage
+
+### New Database Objects (March 2026)
+
+| Object | Type | Purpose |
+|--------|------|---------|
+| `config` | Table | Configurable job parameters |
+| `system_stats` | Table | Archiving job run history |
+| `get_storage_used_mb()` | Function | Returns current Supabase storage usage in MB |
+| `get_reports_for_archiving()` | Function | Returns reports eligible for archiving |
+| `archive-photos` | Edge Function | Photo archiving job |
+| `archive-photos-job` | Cron Job | Weekly schedule (Mondays 2AM UTC) |
 
 ---
 
@@ -945,10 +1022,11 @@ Monitor at: Supabase → Settings → Usage
 
 ### Database Issues
 
-**Approaching 500MB limit:**
-1. Supabase → Database → Usage to identify what uses space
-2. Delete old test records
-3. Upgrade to Supabase Pro ($25/month → 8GB)
+**Storage indicator shows amber or red:**
+1. Check admin dashboard — storage indicator will show current MB
+2. Check `system_stats` table to confirm archiving job is running
+3. If archiving job has not run recently, trigger it manually via Edge Functions
+4. If storage is genuinely filling up, consider upgrading to Supabase Pro ($25/month → 100GB)
 
 **Data seems missing:**
 1. Check active filters in admin dashboard

@@ -13,6 +13,7 @@ Last Updated: March 2026
 | **Public Page** | https://herp-israel-form.vercel.app/public.html | Stats, map, species cards |
 | **Admin Dashboard** | https://herp-israel-form.vercel.app/admin.html | Validate & edit reports |
 | **Supabase Console** | https://supabase.com/dashboard/project/qobayftqligpshmyweio | Database management |
+| **Cloudflare R2** | https://dash.cloudflare.com | Photo archive storage |
 | **Vercel Dashboard** | https://vercel.com | Website deployment |
 | **GitHub Repository** | https://github.com/[username]/herp-israel-form | Source code |
 
@@ -36,6 +37,11 @@ Last Updated: March 2026
 ### Admin Access
 - **URL:** /admin.html
 - **Users:** Managed in Supabase → Authentication
+
+### Cloudflare (Photo Archive)
+- **Service:** R2 Object Storage
+- **Bucket:** herp-israel-photos
+- **Login:** cloudflare.com (Aram's account)
 
 ---
 
@@ -169,13 +175,37 @@ Shows: photo, Hebrew + scientific name, venom/poison badge (with SVG icons), act
 - [ ] Admin dashboard → "ייצא הכל ל-CSV" → save as `reports_backup_YYYY-MM.csv`
 - [ ] Supabase SQL Editor → `SELECT * FROM species ORDER BY common_name;` → export CSV
 - [ ] Save both files locally + Google Drive
-- [ ] Check database size in Supabase → Settings → Usage
+- [ ] Check storage indicator in admin dashboard (should be green)
+- [ ] Check last archiving job status in admin dashboard (should show recent success)
 - [ ] Verify website is online
 - [ ] Test form submission
 
 ---
 
-## ⚠️ TEST_MODE (Admin Code)
+## 📸 Photo Archiving Pipeline
+
+Photos are automatically archived weekly to Cloudflare R2.
+
+**Schedule:** Every Monday at 2:00 AM UTC
+
+**What happens automatically:**
+- Validated reports older than 10 days have their photos moved from Supabase to R2
+- Photos remain fully visible in the admin dashboard (URLs update automatically)
+- Original full-resolution photos are preserved permanently in R2
+
+**Monitor in admin dashboard:** Two cards show current storage usage and last job status.
+
+**If archiving job fails:**
+1. Check admin dashboard — storage card will show current MB
+2. Supabase → SQL Editor → `SELECT * FROM system_stats ORDER BY recorded_at DESC LIMIT 5;`
+3. Contact Aram to manually trigger the job if needed
+
+**Retrieve an original photo from R2:**
+1. Find the report in Supabase → Table Editor → reports
+2. Note the `archived_photo_keys` value (e.g. `2026/report_26400_1.jpg`)
+3. Login to Cloudflare → R2 → herp-israel-photos → browse to the file
+
+---
 
 There is a flag near the top of `admin.html`:
 
