@@ -56,7 +56,7 @@ header{
 .search-box:focus{border-color:var(--gold);}
 .search-box::placeholder{color:var(--text-muted);}
 
-.sb-scroll{flex:1;overflow-y:auto;padding:8px 12px;}
+.sb-scroll{flex:1;overflow-y:auto;padding:8px 12px;min-height:0;}
 .sp-row{display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:6px;cursor:pointer;direction:rtl;transition:background .12s;margin-bottom:1px;}
 .sp-row:hover{background:var(--surface2);}
 .sp-row input[type=checkbox]{accent-color:var(--gold);width:14px;height:14px;flex-shrink:0;cursor:pointer;}
@@ -235,9 +235,17 @@ function findGeoFeature(sci){
 
 function renderSidebar(query=''){
   const q=query.trim().toLowerCase();
-  const filtered=q?allSpecies.filter(s=>s.common_name.includes(q)||s.scientific_name.toLowerCase().includes(q)):allSpecies;
-  const list=document.getElementById('speciesList');
+  // Preserve current checked state before rebuilding DOM
   const checked=getCheckedSet();
+  let filtered=q?allSpecies.filter(s=>s.common_name.includes(q)||s.scientific_name.toLowerCase().includes(q)):allSpecies.slice();
+  // Float selected to top, then alphabetical within each group
+  filtered.sort((a,b)=>{
+    const ac=checked.has(a.scientific_name)?0:1;
+    const bc=checked.has(b.scientific_name)?0:1;
+    if(ac!==bc)return ac-bc;
+    return a.common_name.localeCompare(b.common_name,'he');
+  });
+  const list=document.getElementById('speciesList');
   list.innerHTML='';
   filtered.forEach(s=>{
     const idx=allSpecies.indexOf(s);
@@ -249,7 +257,7 @@ function renderSidebar(query=''){
       <div class="spn"><div class="spn-he">${s.common_name}</div><div class="spn-la">${s.scientific_name}</div></div>
       <div class="cswatch" style="background:${color}"><input type="color" value="${color}" data-sci="${s.scientific_name}"></div>
     `;
-    row.querySelector('input[type=checkbox]').addEventListener('change',updateSelCount);
+    row.querySelector('input[type=checkbox]').addEventListener('change',()=>{updateSelCount();renderSidebar(document.getElementById('searchBox').value);});
     const sw=row.querySelector('.cswatch'),ci=row.querySelector('input[type=color]');
     sw.addEventListener('click',e=>{e.stopPropagation();ci.click();});
     ci.addEventListener('input',e=>{sw.style.background=e.target.value;setColor(s.scientific_name,e.target.value);});
