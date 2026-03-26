@@ -449,48 +449,48 @@ function setLoading(on,msg=''){
 // ── INIT ──
 async function init(){
   setLoading(true,'טוען רשימת מינים...');
-  allSpecies=await loadSpecies();
-  renderSidebar();
-
-  // Pre-check defaults
-  DEFAULT_CHECKED.forEach(sci=>{
-    const sp=allSpecies.find(s=>s.scientific_name.toLowerCase().startsWith(sci.toLowerCase().split(' ').slice(0,2).join(' ')));
-    if(sp){const cb=document.getElementById(`cb_${sp.id}`);if(cb)cb.checked=true;}
-  });
-  updateSelCount();
-
-  setLoading(false);
-  document.getElementById('statusText').textContent='מוכן · בחר מינים ולחץ "החל על המפה"';
-
-  document.getElementById('searchBox').addEventListener('input',e=>renderSidebar(e.target.value));
-  document.getElementById('applyBtn').addEventListener('click',applyToMap);
-
-  // Listen for color changes from cards page
-  window.addEventListener('storage',e=>{
-    if(e.key==='herp_color_change'){
-      renderSidebar(document.getElementById('searchBox').value);
-      // Re-apply active layers with updated color if affected species is active
-      try{
-        const {sci,hex}=JSON.parse(e.newValue||'{}');
-        const sp=allSpecies.find(s=>s.scientific_name===sci);
-        if(sp&&activeLayers[sp.id]){
-          // Re-render this species' layers with new color
-          const entry=activeLayers[sp.id];
-          entry.heatLayers.forEach(l=>{try{map.removeLayer(l)}catch(e){}});
-          if(entry.distLayer)try{map.removeLayer(entry.distLayer)}catch(e){}
-          const cells=heatCache[sp.id]||[];
-          const feat=findGeoFeature(sp.scientific_name);
-          entry.color=hex;
-          entry.heatLayers=addHeatLayers(sp,hex,cells);
-          entry.distLayer=addDistLayer(sp,hex,feat);
-          renderLegend();
-        }
-      }catch(e){}
+  try{
+    allSpecies=await loadSpecies();
+    if(!allSpecies.length){
+      document.getElementById('statusText').textContent='שגיאה: לא ניתן לטעון מינים';
+      return;
     }
-  });
-
-  // Auto-apply defaults on load
-  await applyToMap();
+    renderSidebar();
+    DEFAULT_CHECKED.forEach(sci=>{
+      const sp=allSpecies.find(s=>s.scientific_name.toLowerCase().startsWith(sci.toLowerCase().split(' ').slice(0,2).join(' ')));
+      if(sp){const cb=document.getElementById(`cb_${sp.id}`);if(cb)cb.checked=true;}
+    });
+    updateSelCount();
+    document.getElementById('statusText').textContent='מוכן · בחר מינים ולחץ "החל על המפה"';
+    document.getElementById('searchBox').addEventListener('input',e=>renderSidebar(e.target.value));
+    document.getElementById('applyBtn').addEventListener('click',applyToMap);
+    window.addEventListener('storage',e=>{
+      if(e.key==='herp_color_change'){
+        renderSidebar(document.getElementById('searchBox').value);
+        try{
+          const {sci,hex}=JSON.parse(e.newValue||'{}');
+          const sp=allSpecies.find(s=>s.scientific_name===sci);
+          if(sp&&activeLayers[sp.id]){
+            const entry=activeLayers[sp.id];
+            entry.heatLayers.forEach(l=>{try{map.removeLayer(l)}catch(e){}});
+            if(entry.distLayer)try{map.removeLayer(entry.distLayer)}catch(e){}
+            const cells=heatCache[sp.id]||[];
+            const feat=findGeoFeature(sp.scientific_name);
+            entry.color=hex;
+            entry.heatLayers=addHeatLayers(sp,hex,cells);
+            entry.distLayer=addDistLayer(sp,hex,feat);
+            renderLegend();
+          }
+        }catch(e){}
+      }
+    });
+    await applyToMap();
+  }catch(e){
+    console.error('Init failed:',e);
+    document.getElementById('statusText').textContent='שגיאה בטעינה: '+e.message;
+  }finally{
+    setLoading(false);
+  }
 }
 
 init();
