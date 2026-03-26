@@ -4,309 +4,146 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>כרטיסי מין — Herp Israel Admin</title>
-<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;900&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-/* ── RESET & BASE ── */
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --bg:#0e0e0e;
-  --surface:#161616;
-  --surface2:#1e1e1e;
-  --border:#2a2a2a;
+  --bg:#f0ebe0;
+  --surface:#faf7f2;
+  --surface2:#ede8dd;
+  --border:#d4c9b0;
+  --border-strong:#b8a888;
   --gold:#c8922a;
-  --gold-light:#e8b84b;
-  --text:#ede8df;
-  --muted:#7a7060;
-  --sidebar:300px;
+  --gold-dark:#a07020;
+  --text:#3d2b1f;
+  --text-mid:#6b5040;
+  --text-muted:#9a8070;
+  --sidebar:290px;
 }
-
-/* ── DESKTOP GUARD ── */
+@media(max-width:1023px){
+  .mobile-block{display:flex!important;}
+  body>*:not(.mobile-block){display:none!important;}
+}
 .mobile-block{
-  display:none;
-  position:fixed;inset:0;
-  background:#0e0e0e;
-  z-index:9999;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
-  padding:40px;
-  font-family:'Heebo',sans-serif;
-  color:#ede8df;
-  gap:16px;
+  display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;
+  flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:40px;font-family:'Heebo',sans-serif;color:var(--text);gap:16px;
 }
 .mobile-block .icon{font-size:48px;}
-.mobile-block h2{font-size:20px;font-weight:900;color:#c8922a;direction:rtl;}
-.mobile-block p{font-size:14px;color:#7a7060;direction:rtl;line-height:1.7;}
-@media(max-width:1023px){
-  .mobile-block{display:flex;}
-  body > *:not(.mobile-block){display:none!important;}
-}
+.mobile-block h2{font-size:20px;font-weight:900;color:var(--gold);direction:rtl;}
+.mobile-block p{font-size:14px;color:var(--text-muted);direction:rtl;line-height:1.7;}
 
-/* ── LAYOUT ── */
 body{background:var(--bg);font-family:'Heebo',sans-serif;color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
 
 header{
-  background:var(--surface);
-  border-bottom:1px solid var(--border);
-  padding:14px 24px;
-  display:flex;align-items:center;gap:20px;
-  flex-shrink:0;
+  background:var(--surface);border-bottom:2px solid var(--border);
+  padding:14px 24px;display:flex;align-items:center;gap:20px;flex-shrink:0;
 }
-.header-brand{font-size:12px;font-weight:700;color:var(--gold);direction:rtl;letter-spacing:.5px;}
-.header-brand span{display:block;font-size:10px;font-weight:400;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
-.header-title{font-family:'Crimson Pro',serif;font-size:22px;font-weight:600;flex:1;direction:rtl;}
-.header-hint{font-size:11px;color:var(--muted);direction:rtl;}
+.hbrand{font-size:13px;font-weight:700;color:var(--gold);direction:rtl;}
+.hbrand span{display:block;font-size:10px;font-weight:400;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;}
+.htitle{font-size:20px;font-weight:900;flex:1;direction:rtl;color:var(--text);}
+.hhint{font-size:11px;color:var(--text-muted);direction:rtl;}
 
 .workspace{display:flex;flex:1;overflow:hidden;min-height:0;}
 
-/* ── SIDEBAR ── */
-.sidebar{
-  width:var(--sidebar);
-  background:var(--surface);
-  border-left:1px solid var(--border);
-  display:flex;flex-direction:column;
-  overflow-y:auto;
-  flex-shrink:0;
-}
-.sb-section{padding:16px;border-bottom:1px solid var(--border);}
-.sb-label{
-  font-size:10px;font-weight:700;letter-spacing:2px;
-  color:var(--muted);text-transform:uppercase;
-  margin-bottom:12px;direction:rtl;
-}
-
-/* Search */
-.search-box{
-  width:100%;background:#111;
-  border:1px solid var(--border);border-radius:6px;
-  color:var(--text);font-family:'Heebo',sans-serif;font-size:13px;
-  padding:7px 10px;direction:rtl;outline:none;
-  transition:border-color .15s;
-}
+/* SIDEBAR */
+.sidebar{width:var(--sidebar);background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+.sbs{padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sbl{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;direction:rtl;}
+.search-box{width:100%;background:#fff;border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Heebo',sans-serif;font-size:13px;padding:7px 10px;direction:rtl;outline:none;transition:border-color .15s;}
 .search-box:focus{border-color:var(--gold);}
+.search-box::placeholder{color:var(--text-muted);}
 
-/* Species checkboxes */
-.species-list{margin-top:10px;max-height:420px;overflow-y:auto;}
-.sp-row{
-  display:flex;align-items:center;gap:8px;
-  padding:6px 4px;border-radius:6px;
-  cursor:pointer;direction:rtl;
-  transition:background .12s;
-}
+.sb-scroll{flex:1;overflow-y:auto;padding:8px 12px;}
+.sp-row{display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:6px;cursor:pointer;direction:rtl;transition:background .12s;margin-bottom:1px;}
 .sp-row:hover{background:var(--surface2);}
-.sp-row input[type=checkbox]{
-  accent-color:var(--gold);
-  width:14px;height:14px;flex-shrink:0;cursor:pointer;
-}
-.sp-names{flex:1;min-width:0;}
-.sp-he{font-size:13px;font-weight:600;direction:rtl;}
-.sp-la{font-size:10px;font-style:italic;color:var(--muted);direction:ltr;text-align:right;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.color-swatch{
-  width:14px;height:14px;border-radius:3px;flex-shrink:0;
-  cursor:pointer;border:1px solid rgba(255,255,255,.1);
-  transition:transform .1s;
-}
-.color-swatch:hover{transform:scale(1.3);}
-.color-swatch input[type=color]{
-  opacity:0;width:0;height:0;position:absolute;
-}
+.sp-row input[type=checkbox]{accent-color:var(--gold);width:14px;height:14px;flex-shrink:0;cursor:pointer;}
+.spn{flex:1;min-width:0;}
+.spn-he{font-size:13px;font-weight:600;direction:rtl;color:var(--text);}
+.spn-la{font-size:10px;font-style:italic;color:var(--text-muted);direction:ltr;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cswatch{width:13px;height:13px;border-radius:3px;flex-shrink:0;cursor:pointer;border:1px solid rgba(0,0,0,.18);transition:transform .1s;position:relative;}
+.cswatch:hover{transform:scale(1.35);}
+.cswatch input[type=color]{opacity:0;width:0;height:0;position:absolute;}
 
-/* Generate button */
-.gen-btn{
-  width:100%;padding:10px;
-  background:var(--gold);color:#000;
-  border:none;border-radius:8px;
-  font-family:'Heebo',sans-serif;font-size:13px;font-weight:700;
-  cursor:pointer;direction:rtl;
-  transition:background .15s,transform .1s;
-  margin-top:12px;
-}
-.gen-btn:hover{background:var(--gold-light);transform:translateY(-1px);}
-.gen-btn:active{transform:translateY(0);}
-.gen-btn:disabled{background:#333;color:#666;cursor:not-allowed;transform:none;}
+/* Layer toggles */
+.layer-row{display:flex;align-items:center;justify-content:space-between;direction:rtl;margin-bottom:8px;}
+.layer-row:last-child{margin-bottom:0;}
+.layer-label{font-size:12px;color:var(--text-mid);}
+.switch{position:relative;width:32px;height:17px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{position:absolute;inset:0;background:#ccc;border-radius:17px;cursor:pointer;transition:.2s;}
+.slider:before{content:'';position:absolute;width:11px;height:11px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+input:checked+.slider{background:var(--gold);}
+input:checked+.slider:before{transform:translateX(15px);}
 
-/* Selected count */
-.sel-count{font-size:11px;color:var(--muted);direction:rtl;margin-top:8px;text-align:center;}
+.btn-row{display:flex;gap:8px;}
+.gen-btn{flex:1;padding:9px;background:var(--gold);color:#fff;border:none;border-radius:7px;font-family:'Heebo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;direction:rtl;transition:background .15s;}
+.gen-btn:hover{background:var(--gold-dark);}
+.gen-btn:disabled{background:#ccc;color:#999;cursor:not-allowed;}
+.clear-btn{padding:9px 12px;background:none;color:var(--text-muted);border:1px solid var(--border);border-radius:7px;font-family:'Heebo',sans-serif;font-size:12px;cursor:pointer;direction:rtl;transition:all .15s;white-space:nowrap;}
+.clear-btn:hover{border-color:var(--border-strong);color:var(--text);}
+.sel-count{font-size:11px;color:var(--text-muted);direction:rtl;margin-top:8px;text-align:center;}
 
-/* Palette legend */
-.palette-hint{font-size:10px;color:var(--muted);direction:rtl;line-height:1.6;margin-top:6px;}
+/* MAIN */
+.main-content{flex:1;overflow-y:auto;padding:28px;display:flex;flex-direction:column;gap:24px;background:var(--bg);}
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted);font-size:14px;direction:rtl;text-align:center;padding:60px 0;}
+.empty-state .big{font-size:48px;}
 
-/* ── MAIN CONTENT ── */
-.main-content{
-  flex:1;overflow-y:auto;
-  padding:32px;
-  display:flex;flex-direction:column;
-  gap:28px;
-}
-
-.empty-state{
-  flex:1;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
-  gap:12px;color:var(--muted);
-  font-size:14px;direction:rtl;
-  text-align:center;
-}
-.empty-state .big{font-size:40px;}
-
-/* ── CARDS GRID ── */
-.cards-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(340px,380px));
-  gap:24px;
-  justify-content:start;
-}
-
-/* ── CARD ── */
-.sp-card{
-  background:var(--surface);
-  border-radius:14px;
-  overflow:hidden;
-  border:1px solid var(--border);
-  display:flex;flex-direction:column;
-  transition:transform .2s,box-shadow .2s;
-}
-.sp-card:hover{
-  transform:translateY(-3px);
-  box-shadow:0 16px 48px rgba(0,0,0,.5);
-}
+/* CARDS */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,360px));gap:20px;justify-content:start;}
+.sp-card{background:var(--surface);border-radius:12px;overflow:hidden;border:1px solid var(--border);display:flex;flex-direction:column;box-shadow:0 2px 8px rgba(0,0,0,.06);transition:transform .18s,box-shadow .18s;}
+.sp-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.12);}
 .card-accent{height:3px;}
+.card-head{padding:14px 16px 12px;border-bottom:1px solid var(--border);}
+.c-he{font-size:19px;font-weight:900;direction:rtl;line-height:1.1;color:var(--text);}
+.c-la{font-size:11px;font-style:italic;color:var(--text-muted);margin-top:3px;direction:ltr;text-align:right;}
 
-.card-head{
-  padding:18px 18px 12px;
-  display:flex;align-items:flex-start;
-  justify-content:space-between;gap:10px;
-}
-.card-names{flex:1;}
-.c-he{font-size:20px;font-weight:900;direction:rtl;line-height:1.1;}
-.c-la{font-size:11px;font-style:italic;color:var(--muted);margin-top:3px;direction:ltr;text-align:right;}
-
-.badges{display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0;}
-
-/* Venom badges — matching public.html style */
-.badge{
-  display:inline-flex;align-items:center;gap:4px;
-  padding:3px 9px;border-radius:20px;
-  font-size:10px;font-weight:700;white-space:nowrap;
-}
-.badge-venomous{background:rgba(180,30,30,.2);color:#ff6b6b;border:1px solid rgba(180,30,30,.4);}
-.badge-subvenomous{background:rgba(200,146,42,.2);color:#e8b84b;border:1px solid rgba(200,146,42,.4);}
-.badge-nonvenomous{background:rgba(80,160,80,.2);color:#7bc67a;border:1px solid rgba(80,160,80,.4);}
-.badge-toxic{background:rgba(160,80,200,.2);color:#c97fd5;border:1px solid rgba(160,80,200,.4);}
-
-/* IUCN badges — matching public.html */
-.iucn{
-  display:inline-flex;align-items:center;gap:4px;
-  padding:3px 9px;border-radius:20px;
-  font-size:10px;font-weight:700;white-space:nowrap;
-}
-.iucn-LC{background:rgba(0,150,0,.15);color:#4caf50;border:1px solid rgba(0,150,0,.3);}
-.iucn-NT{background:rgba(100,180,0,.15);color:#8bc34a;border:1px solid rgba(100,180,0,.3);}
-.iucn-VU{background:rgba(255,180,0,.15);color:#ffb300;border:1px solid rgba(255,180,0,.3);}
-.iucn-EN{background:rgba(255,100,0,.15);color:#ff7043;border:1px solid rgba(255,100,0,.3);}
-.iucn-CR{background:rgba(200,0,0,.15);color:#ef5350;border:1px solid rgba(200,0,0,.3);}
-.iucn-DD{background:rgba(120,120,120,.15);color:#9e9e9e;border:1px solid rgba(120,120,120,.3);}
-.iucn-NE{background:rgba(80,80,80,.15);color:#757575;border:1px solid rgba(80,80,80,.3);}
-.iucn-invasive{background:rgba(130,0,180,.2);color:#ce93d8;border:1px solid rgba(130,0,180,.4);}
-
-/* Maps */
-.card-maps{
-  display:grid;grid-template-columns:1fr 1fr;
-  gap:2px;height:200px;
-  margin:0 18px 16px;
-  border-radius:8px;overflow:hidden;
-  border:1px solid var(--border);
-}
-.map-pane{position:relative;overflow:hidden;}
-.map-tag{
-  position:absolute;top:5px;right:6px;z-index:800;
-  background:rgba(0,0,0,.75);color:#fff;
-  font-size:9px;padding:2px 6px;border-radius:8px;
-  direction:rtl;font-family:'Heebo',sans-serif;pointer-events:none;
-}
+/* Single map — dark inside warm card */
+.card-map{height:220px;margin:14px 14px 0;border-radius:8px;overflow:hidden;border:1px solid var(--border-strong);position:relative;}
 .lmap{width:100%;height:100%;}
-.map-spinner{
-  position:absolute;inset:0;
-  display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
-  background:#141414;z-index:900;
-  gap:6px;font-size:10px;color:var(--muted);direction:rtl;
-}
-.spin{
-  width:18px;height:18px;
-  border:2px solid #333;border-top-color:var(--gold);
-  border-radius:50%;animation:spin .7s linear infinite;
-}
+.map-spin-wrap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1a1a1a;z-index:900;gap:6px;font-size:10px;color:#888;direction:rtl;}
+.spin{width:18px;height:18px;border:2px solid #333;border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.no-dist{
-  position:absolute;inset:0;
-  display:flex;align-items:center;justify-content:center;
-  background:#141414;font-size:10px;color:#444;direction:rtl;
-  text-align:center;padding:8px;
-}
 
-/* Observations count */
-.card-foot{
-  border-top:1px solid var(--border);
-  padding:9px 18px;
-  display:flex;align-items:center;justify-content:space-between;
-}
-.obs{font-size:11px;color:var(--muted);direction:rtl;}
-.obs strong{color:var(--text);}
-.brand-foot{font-size:9px;color:#333;direction:rtl;}
+.card-foot{padding:10px 16px;display:flex;align-items:center;justify-content:space-between;margin-top:12px;border-top:1px solid var(--border);}
+.obs{font-size:11px;color:var(--text-muted);direction:rtl;}
+.obs strong{color:var(--text);font-weight:700;}
+.brand-foot{font-size:9px;color:var(--border-strong);direction:rtl;}
 
-/* ── LOADING OVERLAY ── */
-.loading-overlay{
-  position:fixed;inset:0;
-  background:rgba(14,14,14,.85);
-  z-index:5000;
-  display:none;
-  align-items:center;justify-content:center;
-  flex-direction:column;gap:14px;
-  font-size:14px;color:var(--text);direction:rtl;
-}
+/* LOADING */
+.loading-overlay{position:fixed;inset:0;background:rgba(240,235,224,.9);z-index:5000;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;font-size:14px;color:var(--text);direction:rtl;}
 .loading-overlay.visible{display:flex;}
-.loading-overlay .big-spin{
-  width:36px;height:36px;
-  border:3px solid #333;border-top-color:var(--gold);
-  border-radius:50%;animation:spin .8s linear infinite;
-}
+.big-spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;}
 
-/* Leaflet overrides */
 .leaflet-control-attribution{display:none!important;}
-.leaflet-control-zoom a{
-  background:#1a1a1a!important;color:#888!important;border-color:#333!important;
-}
+.leaflet-control-zoom a{background:#1e1e1e!important;color:#888!important;border-color:#333!important;}
+.leaflet-control-zoom a:hover{color:#c8922a!important;}
 </style>
 </head>
 <body>
 
-<!-- Mobile block -->
 <div class="mobile-block">
   <div class="icon">🖥</div>
   <h2>כלי זה מיועד למחשב בלבד</h2>
-  <p>יש לפתוח את הדף במחשב שולחני או נייד.<br>לא נתמך במסך קטן מ-1024px.</p>
+  <p>יש לפתוח את הדף במחשב שולחני או נייד.</p>
 </div>
 
 <div class="loading-overlay" id="loadingOverlay">
   <div class="big-spin"></div>
-  <span id="loadingMsg">טוען מינים...</span>
+  <span id="loadingMsg">טוען...</span>
 </div>
 
 <header>
   <div>
-    <div class="header-brand">זוחלים ודו-חיים בישראל<span>Herpetology Israel · Admin</span></div>
+    <div class="hbrand">זוחלים ודו-חיים בישראל<span>Herpetology Israel · Admin</span></div>
   </div>
-  <div class="header-title">כרטיסי מין</div>
-  <div class="header-hint">בחר מינים מהרשימה ולחץ "צור כרטיסים"</div>
+  <div class="htitle">כרטיסי מין</div>
+  <div class="hhint">בחר מינים ולחץ "צור כרטיסים"</div>
 </header>
 
 <div class="workspace">
-
-  <!-- MAIN -->
   <div class="main-content" id="mainContent">
     <div class="empty-state" id="emptyState">
       <div class="big">🦎</div>
@@ -315,377 +152,238 @@ header{
     <div class="cards-grid" id="cardsGrid" style="display:none"></div>
   </div>
 
-  <!-- SIDEBAR -->
   <div class="sidebar">
-
-    <div class="sb-section">
-      <div class="sb-label">חיפוש מין</div>
+    <div class="sbs">
+      <div class="sbl">חיפוש</div>
       <input class="search-box" id="searchBox" type="text" placeholder="שם עברי או לטיני...">
     </div>
 
-    <div class="sb-section" style="flex:1">
-      <div class="sb-label">בחירת מינים</div>
-      <div class="species-list" id="speciesList"></div>
-      <div class="sel-count" id="selCount">0 מינים נבחרו</div>
+    <div class="sb-scroll" id="speciesList"></div>
+
+    <div class="sbs">
+      <div class="sbl">שכבות במפה</div>
+      <div class="layer-row">
+        <span class="layer-label">תצפיות שדה</span>
+        <label class="switch"><input type="checkbox" id="togHeat" checked><span class="slider"></span></label>
+      </div>
+      <div class="layer-row">
+        <span class="layer-label">תפוצה רשמית</span>
+        <label class="switch"><input type="checkbox" id="togDist" checked><span class="slider"></span></label>
+      </div>
     </div>
 
-    <div class="sb-section">
-      <div class="sb-label">צבעי מינים</div>
-      <div class="palette-hint">לחץ על ריבוע הצבע לצד כל מין לשינוי.<br>הצבעים נשמרים ומשותפים עם מפת ההשוואה.</div>
+    <div class="sbs">
+      <div class="btn-row">
+        <button class="gen-btn" id="genBtn" disabled>צור כרטיסים</button>
+        <button class="clear-btn" id="clearBtn">נקה הכל</button>
+      </div>
+      <div class="sel-count" id="selCount">לא נבחרו מינים</div>
     </div>
-
-    <div class="sb-section">
-      <button class="gen-btn" id="genBtn" disabled>צור כרטיסים</button>
-    </div>
-
   </div>
 </div>
 
 <script>
-// ── CONFIG ──
 const SB_URL  = 'https://qobayftqligpshmyweio.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvYmF5ZnRxbGlncHNobXl3ZWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTEzMDcsImV4cCI6MjA4NzA4NzMwN30.u69AQLyyrXJvgBLTUO9ZpMvpd6dbqTDNj9Z_0RSctps';
 const GEOJSON_URL = 'https://herp-israel-form.vercel.app/herp.geojson';
 const ISRAEL_BOUNDS = [[29.4,34.2],[33.4,35.9]];
 const CELL_DEG = 10/111;
+const DEFAULT_COLORS = ['#4a90d9','#e05c3a','#7bc67a','#c97fd5','#e8a030','#5ecde0','#e07030','#8080e0','#e06080','#50b090'];
 
-const DEFAULT_CHECKED = ['Dolichophis jugularis','Walterinnesia aegyptia','Atractaspis engaddensis'];
+function loadPalette(){try{return JSON.parse(localStorage.getItem('herp_species_colors')||'{}')}catch(e){return{}}}
+function savePalette(m){localStorage.setItem('herp_species_colors',JSON.stringify(m));}
+function getColor(sci,idx){const m=loadPalette();if(m[sci])return m[sci];const c=DEFAULT_COLORS[idx%DEFAULT_COLORS.length];m[sci]=c;savePalette(m);return c;}
+function setColor(sci,hex){const m=loadPalette();m[sci]=hex;savePalette(m);localStorage.setItem('herp_color_change',JSON.stringify({sci,hex,ts:Date.now()}));}
+function hexToRgb(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
 
-const DEFAULT_COLORS = [
-  '#4a90d9','#e05c3a','#7bc67a','#c97fd5','#f0c842',
-  '#5ecde0','#e88a3c','#a0a0ff','#f06292','#80cbc4'
-];
-
-// ── PALETTE (localStorage) ──
-function loadPalette(){ try{return JSON.parse(localStorage.getItem('herp_species_colors')||'{}')}catch(e){return{}} }
-function savePalette(m){ localStorage.setItem('herp_species_colors',JSON.stringify(m)); }
-function getColor(sci,idx){
-  const m=loadPalette();
-  if(m[sci]) return m[sci];
-  const c=DEFAULT_COLORS[idx%DEFAULT_COLORS.length];
-  m[sci]=c; savePalette(m); return c;
-}
-function setColor(sci,hex){
-  const m=loadPalette(); m[sci]=hex; savePalette(m);
-  // broadcast to comparison map open in same browser
-  localStorage.setItem('herp_color_change',JSON.stringify({sci,hex,ts:Date.now()}));
-}
-function hexToRgb(hex){
-  return [parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
-}
-
-// ── STATE ──
 let allSpecies=[], geojsonData=null, heatCache={};
+let showHeat=true, showDist=true;
+let cardMaps={};
 
-// ── API ──
 async function sbFetch(path){
-  try {
+  try{
     const r=await fetch(`${SB_URL}/rest/v1/${path}`,{headers:{'apikey':SB_ANON,'Accept':'application/json'}});
-    if(!r.ok){ console.error('Supabase error',r.status,await r.text()); return []; }
-    const data=await r.json();
-    return Array.isArray(data)?data:[];
-  } catch(e){
-    console.error('sbFetch failed:',e);
-    return [];
-  }
+    if(!r.ok){console.error('SB',r.status,await r.text());return[];}
+    const d=await r.json();return Array.isArray(d)?d:[];
+  }catch(e){console.error('sbFetch:',e);return[];}
 }
-
 async function loadSpecies(){
-  const data=await sbFetch('species?select=id,common_name,scientific_name,venom_level,red_list_status,is_invasive&order=common_name');
-  if(!data.length){ console.warn('No species returned'); return []; }
-  return data.filter(s=>
-    s.common_name!=='לא מזוהה' &&
-    !s.common_name.includes('(סוג)') &&
-    s.scientific_name.trim().split(/\s+/).length>=2
-  );
+  const d=await sbFetch('species?select=id,common_name,scientific_name&order=common_name');
+  return d.filter(s=>s.common_name!=='לא מזוהה'&&!s.common_name.includes('(סוג)')&&s.scientific_name.trim().split(/\s+/).length>=2);
 }
-
 async function fetchGeoJSON(){
-  if(geojsonData) return geojsonData;
-  const r=await fetch(GEOJSON_URL);
-  geojsonData=await r.json();
-  return geojsonData;
+  if(geojsonData)return geojsonData;
+  const r=await fetch(GEOJSON_URL);geojsonData=await r.json();return geojsonData;
 }
-
 async function fetchHeatmap(id){
-  if(heatCache[id]) return heatCache[id];
+  if(heatCache[id])return heatCache[id];
   const d=await sbFetch(`public_heatmap_grid?species_id=eq.${id}&select=grid_x,grid_y,count`);
-  heatCache[id]=d; return d;
+  heatCache[id]=d;return d;
 }
-
 async function fetchCount(id){
-  const r=await fetch(
-    `${SB_URL}/rest/v1/public_reports_safe?species_id=eq.${id}&select=id`,
-    {headers:{'apikey':SB_ANON,'Accept':'application/json','Prefer':'count=exact','Range':'0-0'}}
-  );
-  const cr=r.headers.get('content-range');
-  return cr?cr.split('/')[1]:'—';
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/public_reports_safe?species_id=eq.${id}&select=id`,
+      {headers:{'apikey':SB_ANON,'Accept':'application/json','Prefer':'count=exact','Range':'0-0'}});
+    const cr=r.headers.get('content-range');return cr?cr.split('/')[1]:'—';
+  }catch(e){return'—';}
 }
-
 function findGeoFeature(sci){
-  if(!geojsonData) return null;
-  const parts=sci.trim().split(/\s+/);
-  const bin=`${parts[0]} ${parts[1]}`;
+  if(!geojsonData)return null;
+  const p=sci.trim().split(/\s+/);const bin=`${p[0]} ${p[1]}`;
   return geojsonData.features.find(f=>(f.properties?.binomial||'').toLowerCase()===bin.toLowerCase())||null;
 }
 
-// ── BADGES ──
-function venomBadge(v){
-  const map={
-    'ארסי':    ['badge-venomous','☠ ארסי'],
-    'תת-ארסי': ['badge-subvenomous','⚠ תת-ארסי'],
-    'לא ארסי': ['badge-nonvenomous','✓ לא ארסי'],
-    'רעיל':    ['badge-toxic','☣ רעיל'],
-  };
-  const [cls,label]=map[v]||['badge-nonvenomous',v||'—'];
-  return `<span class="badge ${cls}">${label}</span>`;
-}
-
-function iucnBadge(status,isInvasive){
-  if(isInvasive) return `<span class="iucn iucn-invasive">🌿 מין פולש</span>`;
-  const labels={LC:'מינימל סיכון',NT:'קרוב לסכנה',VU:'פגיע',EN:'בסכנה',CR:'בסכנה חמורה',DD:'חסר מידע',NE:'לא הוערך'};
-  const cls=`iucn-${status||'NE'}`;
-  const label=labels[status]||status||'לא הוערך';
-  return `<span class="iucn ${cls}">${label}</span>`;
-}
-
-// ── SIDEBAR RENDER ──
 function renderSidebar(query=''){
   const q=query.trim().toLowerCase();
-  const filtered=q
-    ?allSpecies.filter(s=>s.common_name.includes(q)||s.scientific_name.toLowerCase().includes(q))
-    :allSpecies;
-
+  const filtered=q?allSpecies.filter(s=>s.common_name.includes(q)||s.scientific_name.toLowerCase().includes(q)):allSpecies;
   const list=document.getElementById('speciesList');
+  const checked=getCheckedSet();
   list.innerHTML='';
-
-  const checked=getChecked();
-
-  filtered.forEach((s,i)=>{
-    const globalIdx=allSpecies.indexOf(s);
-    const isChecked=checked.has(s.scientific_name);
-    const color=getColor(s.scientific_name,globalIdx);
-
+  filtered.forEach(s=>{
+    const idx=allSpecies.indexOf(s);
+    const color=getColor(s.scientific_name,idx);
     const row=document.createElement('div');
     row.className='sp-row';
     row.innerHTML=`
-      <input type="checkbox" id="cb_${s.id}" data-sci="${s.scientific_name}" ${isChecked?'checked':''}>
-      <div class="sp-names">
-        <div class="sp-he">${s.common_name}</div>
-        <div class="sp-la">${s.scientific_name}</div>
-      </div>
-      <div class="color-swatch" style="background:${color}" title="שנה צבע" data-sci="${s.scientific_name}">
-        <input type="color" value="${color}" data-sci="${s.scientific_name}">
-      </div>
+      <input type="checkbox" id="cb_${s.id}" data-sci="${s.scientific_name}" ${checked.has(s.scientific_name)?'checked':''}>
+      <div class="spn"><div class="spn-he">${s.common_name}</div><div class="spn-la">${s.scientific_name}</div></div>
+      <div class="cswatch" style="background:${color}"><input type="color" value="${color}" data-sci="${s.scientific_name}"></div>
     `;
-
-    // checkbox
-    row.querySelector('input[type=checkbox]').addEventListener('change',()=>updateSelCount());
-
-    // color swatch click → open color input
-    const swatch=row.querySelector('.color-swatch');
-    const colorInput=row.querySelector('input[type=color]');
-    swatch.addEventListener('click',e=>{e.stopPropagation();colorInput.click();});
-    colorInput.addEventListener('input',e=>{
-      const hex=e.target.value;
-      swatch.style.background=hex;
-      setColor(s.scientific_name,hex);
-    });
-    colorInput.addEventListener('change',e=>{
-      setColor(s.scientific_name,e.target.value);
-    });
-
+    row.querySelector('input[type=checkbox]').addEventListener('change',updateSelCount);
+    const sw=row.querySelector('.cswatch'),ci=row.querySelector('input[type=color]');
+    sw.addEventListener('click',e=>{e.stopPropagation();ci.click();});
+    ci.addEventListener('input',e=>{sw.style.background=e.target.value;setColor(s.scientific_name,e.target.value);});
+    ci.addEventListener('change',e=>setColor(s.scientific_name,e.target.value));
     list.appendChild(row);
   });
-
   updateSelCount();
 }
 
-function getChecked(){
-  const checkboxes=document.querySelectorAll('#speciesList input[type=checkbox]:checked');
-  return new Set([...checkboxes].map(c=>c.dataset.sci));
-}
-
+function getCheckedSet(){return new Set([...document.querySelectorAll('#speciesList input[type=checkbox]:checked')].map(c=>c.dataset.sci));}
 function updateSelCount(){
   const n=document.querySelectorAll('#speciesList input[type=checkbox]:checked').length;
-  document.getElementById('selCount').textContent=`${n} מינים נבחרו`;
+  document.getElementById('selCount').textContent=n===0?'לא נבחרו מינים':`${n} מינים נבחרו`;
   document.getElementById('genBtn').disabled=n===0;
 }
 
-// ── MAP INIT ──
-function makeMap(containerId){
-  const m=L.map(containerId,{
-    zoomControl:false,scrollWheelZoom:false,dragging:false,
-    doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false,touchZoom:false
-  });
+function makeLeafletMap(id){
+  const m=L.map(id,{zoomControl:true,scrollWheelZoom:false,dragging:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false,touchZoom:false});
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(m);
   m.fitBounds(ISRAEL_BOUNDS);
   return m;
 }
 
-function renderHeat(map,cells,colorHex){
-  if(!cells||!cells.length) return;
-  const rgb=hexToRgb(colorHex);
+function buildHeatLayers(cells,color,addToMap,map){
+  if(!cells||!cells.length)return[];
+  const rgb=hexToRgb(color);
   const maxC=Math.max(...cells.map(c=>c.count));
-  cells.forEach(cell=>{
-    const lat=cell.grid_y*CELL_DEG, lng=cell.grid_x*CELL_DEG;
+  return cells.map(cell=>{
+    const lat=cell.grid_y*CELL_DEG,lng=cell.grid_x*CELL_DEG;
     const alpha=0.15+(cell.count/maxC)*0.78;
     const [r,g,b]=rgb;
-    L.rectangle([[lat,lng],[lat+CELL_DEG,lng+CELL_DEG]],{
-      color:'transparent',
-      fillColor:`rgba(${r},${g},${b},${alpha})`,
-      fillOpacity:1,weight:0
-    }).addTo(map);
+    const l=L.rectangle([[lat,lng],[lat+CELL_DEG,lng+CELL_DEG]],{color:'transparent',fillColor:`rgba(${r},${g},${b},${alpha})`,fillOpacity:1,weight:0});
+    if(addToMap)l.addTo(map);
+    return l;
   });
 }
 
-// ── BUILD CARDS ──
+function buildDistLayer(feat,color,addToMap,map){
+  if(!feat)return null;
+  const rgb=hexToRgb(color);
+  const l=L.geoJSON(feat,{style:{color,fillColor:`rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.15)`,fillOpacity:1,weight:2,opacity:.85}});
+  if(addToMap)l.addTo(map);
+  return l;
+}
+
+document.getElementById('togHeat').addEventListener('change',function(){
+  showHeat=this.checked;
+  Object.values(cardMaps).forEach(({map,heatLayers})=>{
+    heatLayers.forEach(l=>{if(showHeat)l.addTo(map);else try{map.removeLayer(l)}catch(e){}});
+  });
+});
+document.getElementById('togDist').addEventListener('change',function(){
+  showDist=this.checked;
+  Object.values(cardMaps).forEach(({map,distLayer})=>{
+    if(!distLayer)return;
+    if(showDist)distLayer.addTo(map);else try{map.removeLayer(distLayer)}catch(e){}
+  });
+});
+
 async function buildCards(){
-  const checked=getChecked();
+  const checked=getCheckedSet();
   const selected=allSpecies.filter(s=>checked.has(s.scientific_name));
-  if(!selected.length) return;
-
-  setLoading(true,'טוען נתוני מינים...');
-
+  if(!selected.length)return;
+  setLoading(true,'טוען נתונים...');
   document.getElementById('emptyState').style.display='none';
   const grid=document.getElementById('cardsGrid');
-  grid.style.display='grid';
-  grid.innerHTML='';
-
-  // Fetch GeoJSON once
-  setLoading(true,'טוען מפת תפוצה...');
+  grid.style.display='grid';grid.innerHTML='';cardMaps={};
   await fetchGeoJSON();
-
-  for(const [i,sp] of selected.entries()){
+  for(const sp of selected){
     setLoading(true,`בונה כרטיס: ${sp.common_name}...`);
-    await buildOneCard(sp, allSpecies.indexOf(sp));
+    await buildOneCard(sp);
   }
-
   setLoading(false);
 }
 
-async function buildOneCard(sp, globalIdx){
-  const color=getColor(sp.scientific_name,globalIdx);
-  const cardId=`card_${sp.id}`;
-
+async function buildOneCard(sp){
+  const idx=allSpecies.indexOf(sp);
+  const color=getColor(sp.scientific_name,idx);
   const card=document.createElement('div');
   card.className='sp-card';
-  card.id=cardId;
   card.innerHTML=`
     <div class="card-accent" style="background:${color}"></div>
     <div class="card-head">
-      <div class="card-names">
-        <div class="c-he">${sp.common_name}</div>
-        <div class="c-la">${sp.scientific_name}</div>
-      </div>
-      <div class="badges">
-        ${venomBadge(sp.venom_level)}
-        ${iucnBadge(sp.red_list_status,sp.is_invasive)}
-      </div>
+      <div class="c-he">${sp.common_name}</div>
+      <div class="c-la">${sp.scientific_name}</div>
     </div>
-    <div class="card-maps">
-      <div class="map-pane">
-        <div class="map-tag">תצפיות שדה</div>
-        <div class="lmap" id="hmap_${sp.id}"></div>
-        <div class="map-spinner" id="hload_${sp.id}"><div class="spin"></div><span>טוען...</span></div>
-      </div>
-      <div class="map-pane">
-        <div class="map-tag">תפוצה רשמית</div>
-        <div class="lmap" id="dmap_${sp.id}"></div>
-        <div class="map-spinner" id="dload_${sp.id}"><div class="spin"></div><span>טוען...</span></div>
-      </div>
+    <div class="card-map">
+      <div class="lmap" id="map_${sp.id}"></div>
+      <div class="map-spin-wrap" id="mload_${sp.id}"><div class="spin"></div><span>טוען מפה...</span></div>
     </div>
     <div class="card-foot">
-      <div class="obs" id="obs_${sp.id}">טוען תצפיות...</div>
+      <div class="obs" id="obs_${sp.id}">טוען...</div>
       <div class="brand-foot">© 2026 זוחלים ודו-חיים בישראל</div>
     </div>
   `;
   document.getElementById('cardsGrid').appendChild(card);
 
-  // Render heatmap
-  const hmap=makeMap(`hmap_${sp.id}`);
-  const cells=await fetchHeatmap(sp.id);
-  renderHeat(hmap,cells,color);
-  document.getElementById(`hload_${sp.id}`).style.display='none';
-  setTimeout(()=>hmap.invalidateSize(),150);
-
-  // Render distribution
-  const dmap=makeMap(`dmap_${sp.id}`);
+  const map=makeLeafletMap(`map_${sp.id}`);
+  const [cells,cnt]=await Promise.all([fetchHeatmap(sp.id),fetchCount(sp.id)]);
   const feat=findGeoFeature(sp.scientific_name);
-  if(feat){
-    const rgb=hexToRgb(color);
-    L.geoJSON(feat,{style:{
-      color,fillColor:`rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.18)`,
-      fillOpacity:1,weight:1.5,opacity:.85
-    }}).addTo(dmap);
-    document.getElementById(`dload_${sp.id}`).style.display='none';
-  } else {
-    document.getElementById(`dload_${sp.id}`).outerHTML=
-      `<div class="no-dist">אין נתוני תפוצה<br>זמינים</div>`;
-  }
-  setTimeout(()=>dmap.invalidateSize(),150);
 
-  // Count
-  const cnt=await fetchCount(sp.id);
+  const heatLayers=buildHeatLayers(cells,color,showHeat,map);
+  const distLayer=buildDistLayer(feat,color,showDist,map);
+  cardMaps[sp.id]={map,heatLayers,distLayer};
+
+  document.getElementById(`mload_${sp.id}`).style.display='none';
+  setTimeout(()=>map.invalidateSize(),150);
   const obsEl=document.getElementById(`obs_${sp.id}`);
-  if(obsEl) obsEl.innerHTML=`<strong>${cnt}</strong> תצפיות מאומתות`;
+  if(obsEl)obsEl.innerHTML=`<strong>${cnt}</strong> תצפיות מאומתות`;
 }
 
 function setLoading(on,msg=''){
-  const el=document.getElementById('loadingOverlay');
-  el.classList.toggle('visible',on);
-  if(msg) document.getElementById('loadingMsg').textContent=msg;
+  document.getElementById('loadingOverlay').classList.toggle('visible',on);
+  if(msg)document.getElementById('loadingMsg').textContent=msg;
 }
 
-// ── INIT ──
 async function init(){
   setLoading(true,'טוען רשימת מינים...');
-  try {
+  try{
     allSpecies=await loadSpecies();
-
-    if(!allSpecies.length){
-      document.getElementById('emptyState').innerHTML='<div class="big">⚠</div><div>לא ניתן לטעון מינים — בדוק חיבור או הגדרות Supabase</div>';
-      return;
-    }
-
-    // Pre-check defaults
-    const firstLoad=!sessionStorage.getItem('herp_cards_loaded');
-    if(firstLoad){
-      sessionStorage.setItem('herp_cards_loaded','1');
-      DEFAULT_CHECKED.forEach((sci,i)=>getColor(sci,allSpecies.findIndex(s=>s.scientific_name.startsWith(sci.split(' ').slice(0,2).join(' ')))||i));
-    }
-
+    if(!allSpecies.length){document.getElementById('emptyState').innerHTML='<div class="big">⚠</div><div>לא ניתן לטעון מינים</div>';return;}
     renderSidebar();
-
-    // Pre-check defaults in DOM after render
-    DEFAULT_CHECKED.forEach(sci=>{
-      const sp=allSpecies.find(s=>s.scientific_name.toLowerCase().startsWith(sci.toLowerCase().split(' ').slice(0,2).join(' ')));
-      if(sp){
-        const cb=document.getElementById(`cb_${sp.id}`);
-        if(cb) cb.checked=true;
-      }
-    });
-    updateSelCount();
-
-    // Search
     document.getElementById('searchBox').addEventListener('input',e=>renderSidebar(e.target.value));
-
-    // Generate
     document.getElementById('genBtn').addEventListener('click',buildCards);
-
-    // Listen for color changes from other tab
-    window.addEventListener('storage',e=>{
-      if(e.key==='herp_color_change') renderSidebar(document.getElementById('searchBox').value);
+    document.getElementById('clearBtn').addEventListener('click',()=>{
+      document.querySelectorAll('#speciesList input[type=checkbox]').forEach(cb=>cb.checked=false);
+      updateSelCount();
     });
-
-  } catch(e) {
-    console.error('Init failed:',e);
-    document.getElementById('emptyState').innerHTML=`<div class="big">⚠</div><div>שגיאה בטעינה: ${e.message}</div>`;
-  } finally {
-    setLoading(false);
-  }
+    window.addEventListener('storage',e=>{if(e.key==='herp_color_change')renderSidebar(document.getElementById('searchBox').value);});
+  }catch(e){
+    console.error('Init:',e);
+    document.getElementById('emptyState').innerHTML=`<div class="big">⚠</div><div>שגיאה: ${e.message}</div>`;
+  }finally{setLoading(false);}
 }
-
 init();
 </script>
 </body>
