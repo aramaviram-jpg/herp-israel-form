@@ -379,12 +379,20 @@ let allSpecies=[], geojsonData=null, heatCache={};
 
 // ── API ──
 async function sbFetch(path){
-  const r=await fetch(`${SB_URL}/rest/v1/${path}`,{headers:{'apikey':SB_ANON,'Accept':'application/json'}});
-  return r.json();
+  try {
+    const r=await fetch(`${SB_URL}/rest/v1/${path}`,{headers:{'apikey':SB_ANON,'Accept':'application/json'}});
+    if(!r.ok){ console.error('Supabase error',r.status,await r.text()); return []; }
+    const data=await r.json();
+    return Array.isArray(data)?data:[];
+  } catch(e){
+    console.error('sbFetch failed:',e);
+    return [];
+  }
 }
 
 async function loadSpecies(){
   const data=await sbFetch('species?select=id,common_name,scientific_name,venom_level,red_list_status,is_invasive&order=common_name');
+  if(!data.length){ console.warn('No species returned'); return []; }
   return data.filter(s=>
     s.common_name!=='לא מזוהה' &&
     !s.common_name.includes('(סוג)') &&
@@ -632,42 +640,50 @@ function setLoading(on,msg=''){
 // ── INIT ──
 async function init(){
   setLoading(true,'טוען רשימת מינים...');
-  allSpecies=await loadSpecies();
+  try {
+    allSpecies=await loadSpecies();
 
-  // Pre-check defaults
-  // We'll mark defaults; renderSidebar reads from palette/checked state
-  // We use a temporary set stored in sessionStorage so defaults apply on first load only
-  const firstLoad=!sessionStorage.getItem('herp_cards_loaded');
-  if(firstLoad){
-    sessionStorage.setItem('herp_cards_loaded','1');
-    // Assign default colors to the 3 black snakes if not already set
-    DEFAULT_CHECKED.forEach((sci,i)=>getColor(sci,allSpecies.findIndex(s=>s.scientific_name.startsWith(sci.split(' ').slice(0,2).join(' ')))||i));
-  }
-
-  renderSidebar();
-
-  // Pre-check defaults in DOM after render
-  DEFAULT_CHECKED.forEach(sci=>{
-    const sp=allSpecies.find(s=>s.scientific_name.toLowerCase().startsWith(sci.toLowerCase().split(' ').slice(0,2).join(' ')));
-    if(sp){
-      const cb=document.getElementById(`cb_${sp.id}`);
-      if(cb) cb.checked=true;
+    if(!allSpecies.length){
+      document.getElementById('emptyState').innerHTML='<div class="big">⚠</div><div>לא ניתן לטעון מינים — בדוק חיבור או הגדרות Supabase</div>';
+      return;
     }
-  });
-  updateSelCount();
 
-  setLoading(false);
+    // Pre-check defaults
+    const firstLoad=!sessionStorage.getItem('herp_cards_loaded');
+    if(firstLoad){
+      sessionStorage.setItem('herp_cards_loaded','1');
+      DEFAULT_CHECKED.forEach((sci,i)=>getColor(sci,allSpecies.findIndex(s=>s.scientific_name.startsWith(sci.split(' ').slice(0,2).join(' ')))||i));
+    }
 
-  // Search
-  document.getElementById('searchBox').addEventListener('input',e=>renderSidebar(e.target.value));
+    renderSidebar();
 
-  // Generate
-  document.getElementById('genBtn').addEventListener('click',buildCards);
+    // Pre-check defaults in DOM after render
+    DEFAULT_CHECKED.forEach(sci=>{
+      const sp=allSpecies.find(s=>s.scientific_name.toLowerCase().startsWith(sci.toLowerCase().split(' ').slice(0,2).join(' ')));
+      if(sp){
+        const cb=document.getElementById(`cb_${sp.id}`);
+        if(cb) cb.checked=true;
+      }
+    });
+    updateSelCount();
 
-  // Listen for color changes from other tab
-  window.addEventListener('storage',e=>{
-    if(e.key==='herp_color_change') renderSidebar(document.getElementById('searchBox').value);
-  });
+    // Search
+    document.getElementById('searchBox').addEventListener('input',e=>renderSidebar(e.target.value));
+
+    // Generate
+    document.getElementById('genBtn').addEventListener('click',buildCards);
+
+    // Listen for color changes from other tab
+    window.addEventListener('storage',e=>{
+      if(e.key==='herp_color_change') renderSidebar(document.getElementById('searchBox').value);
+    });
+
+  } catch(e) {
+    console.error('Init failed:',e);
+    document.getElementById('emptyState').innerHTML=`<div class="big">⚠</div><div>שגיאה בטעינה: ${e.message}</div>`;
+  } finally {
+    setLoading(false);
+  }
 }
 
 init();
