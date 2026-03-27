@@ -229,6 +229,11 @@ let showHeat=true, showDist=true;
 let activeLayers={};
 let selectedSpecies=new Set();
 
+const TILE_LIGHT='https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png';
+const TILE_DARK='https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png';
+let mapMode=localStorage.getItem('herp_map_mode')||'light';
+function getCurrentTile(){return mapMode==='dark'?TILE_DARK:TILE_LIGHT;}
+
 const map=L.map('mainMap',{zoomControl:true,scrollWheelZoom:true}).fitBounds(ISRAEL_BOUNDS);
 L.tileLayer(getCurrentTile(),{maxZoom:19}).addTo(map);
 
@@ -382,12 +387,6 @@ function setLoading(on,msg=''){
   document.getElementById('loadingOverlay').classList.toggle('visible',on);
   if(msg)document.getElementById('loadingMsg').textContent=msg;
 }
-
-const TILE_LIGHT='https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png';
-const TILE_DARK='https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png';
-let mapMode=localStorage.getItem('herp_map_mode')||'light';
-
-function getCurrentTile(){return mapMode==='dark'?TILE_DARK:TILE_LIGHT;}
 
 function applyMapMode(){
   const isDark=mapMode==='dark';
