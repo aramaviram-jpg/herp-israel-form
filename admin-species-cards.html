@@ -51,6 +51,12 @@ header{
   transition:all .15s;flex-shrink:0;
 }
 .sidebar-toggle:hover{border-color:var(--gold);color:var(--gold);}
+.map-mode-toggle{
+  background:none;border:1px solid var(--border);border-radius:6px;
+  color:var(--text-mid);font-size:13px;padding:6px 10px;cursor:pointer;
+  transition:all .15s;flex-shrink:0;
+}
+.map-mode-toggle:hover{border-color:var(--gold);color:var(--gold);}
 .sidebar.collapsed{display:none;}
 .workspace.sidebar-hidden .main-content{padding:28px;}
 
@@ -134,6 +140,22 @@ input:checked+.slider:before{transform:translateX(15px);}
 .leaflet-control-attribution{display:none!important;}
 .leaflet-control-zoom a{background:#1e1e1e!important;color:#888!important;border-color:#333!important;}
 .leaflet-control-zoom a:hover{color:#c8922a!important;}
+
+/* Light mode overrides for map widgets */
+.map-light-mode .leaflet-control-zoom a{
+  background:#faf7f2!important;
+  color:#6b5040!important;
+  border-color:#d4c9b0!important;
+}
+.map-light-mode .leaflet-control-zoom a:hover{
+  background:#f0ebe0!important;
+  color:#c8922a!important;
+}
+.map-light-mode.card-map .leaflet-control-zoom a{
+  background:#faf7f2!important;
+  color:#6b5040!important;
+  border-color:#d4c9b0!important;
+}
 </style>
 </head>
 <body>
@@ -156,6 +178,7 @@ input:checked+.slider:before{transform:translateX(15px);}
   <div class="htitle">כרטיסי מין</div>
   <div class="hhint">בחר מינים ולחץ "צור כרטיסים"</div>
   <button class="sidebar-toggle" id="sidebarToggle" title="הצג/הסתר תפריט">◀ תפריט</button>
+  <button class="map-mode-toggle" id="mapModeToggle">🌙 מפה כהה</button>
 </header>
 
 <div class="workspace">
@@ -297,8 +320,11 @@ function updateSelCount(){
 
 function makeLeafletMap(id){
   const m=L.map(id,{zoomControl:true,scrollWheelZoom:false,dragging:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false,touchZoom:false});
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(m);
+  L.tileLayer(getCurrentTile(),{maxZoom:19}).addTo(m);
   m.fitBounds(ISRAEL_BOUNDS);
+  // Apply current mode to the container
+  const container=document.getElementById(id)?.parentElement;
+  if(container) container.classList.toggle('map-light-mode',mapMode==='light');
   return m;
 }
 
@@ -422,6 +448,26 @@ function setLoading(on,msg=''){
   if(msg)document.getElementById('loadingMsg').textContent=msg;
 }
 
+const TILE_LIGHT='https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png';
+const TILE_DARK='https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png';
+let mapMode=localStorage.getItem('herp_map_mode')||'light';
+
+function getCurrentTile(){return mapMode==='dark'?TILE_DARK:TILE_LIGHT;}
+
+function applyMapMode(){
+  const isDark=mapMode==='dark';
+  document.getElementById('mapModeToggle').textContent=isDark?'☀️ מפה בהירה':'🌙 מפה כהה';
+  // Toggle light-mode class on all card-map containers
+  document.querySelectorAll('.card-map').forEach(el=>{
+    el.classList.toggle('map-light-mode',!isDark);
+  });
+  // Update tile layers on all existing card maps
+  Object.values(cardMaps).forEach(({map})=>{
+    map.eachLayer(l=>{if(l._url)map.removeLayer(l);});
+    L.tileLayer(getCurrentTile(),{maxZoom:19}).addTo(map);
+  });
+}
+
 async function init(){
   setLoading(true,'טוען רשימת מינים...');
   try{
@@ -435,6 +481,13 @@ async function init(){
       renderSidebar(document.getElementById('searchBox').value);
     });
     window.addEventListener('storage',e=>{if(e.key==='herp_color_change')renderSidebar(document.getElementById('searchBox').value);});
+    // Map mode toggle
+    document.getElementById('mapModeToggle').addEventListener('click',()=>{
+      mapMode=mapMode==='light'?'dark':'light';
+      localStorage.setItem('herp_map_mode',mapMode);
+      applyMapMode();
+    });
+    applyMapMode(); // apply saved preference on load
     // Sidebar toggle
     document.getElementById('sidebarToggle').addEventListener('click',()=>{
       const sb=document.querySelector('.sidebar');
