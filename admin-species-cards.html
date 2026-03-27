@@ -45,6 +45,14 @@ header{
 .hbrand span{display:block;font-size:10px;font-weight:400;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;}
 .htitle{font-size:20px;font-weight:900;flex:1;direction:rtl;color:var(--text);}
 .hhint{font-size:11px;color:var(--text-muted);direction:rtl;}
+.sidebar-toggle{
+  background:none;border:1px solid var(--border);border-radius:6px;
+  color:var(--text-mid);font-size:13px;padding:6px 10px;cursor:pointer;
+  transition:all .15s;flex-shrink:0;
+}
+.sidebar-toggle:hover{border-color:var(--gold);color:var(--gold);}
+.sidebar.collapsed{display:none;}
+.workspace.sidebar-hidden .main-content{padding:28px;}
 
 .workspace{display:flex;flex:1;overflow:hidden;min-height:0;}
 
@@ -90,9 +98,15 @@ input:checked+.slider:before{transform:translateX(15px);}
 .main-content{flex:1;overflow-y:auto;padding:28px;display:flex;flex-direction:column;gap:24px;background:var(--bg);}
 .empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted);font-size:14px;direction:rtl;text-align:center;padding:60px 0;}
 .empty-state .big{font-size:48px;}
+.row-note{
+  text-align:center;font-size:12px;color:var(--text-muted);
+  direction:rtl;padding:6px 0 2px;
+  border-top:1px dashed var(--border);margin-top:4px;
+}
 
 /* CARDS */
-.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,360px));gap:20px;justify-content:start;}
+.cards-grid{display:grid;gap:24px;justify-content:center;}
+/* layout set dynamically by JS based on count */
 .sp-card{background:var(--surface);border-radius:12px;overflow:hidden;border:1px solid var(--border);display:flex;flex-direction:column;box-shadow:0 2px 8px rgba(0,0,0,.06);transition:transform .18s,box-shadow .18s;}
 .sp-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.12);}
 .card-accent{height:3px;}
@@ -141,6 +155,7 @@ input:checked+.slider:before{transform:translateX(15px);}
   </div>
   <div class="htitle">כרטיסי מין</div>
   <div class="hhint">בחר מינים ולחץ "צור כרטיסים"</div>
+  <button class="sidebar-toggle" id="sidebarToggle" title="הצג/הסתר תפריט">◀ תפריט</button>
 </header>
 
 <div class="workspace">
@@ -282,7 +297,7 @@ function updateSelCount(){
 
 function makeLeafletMap(id){
   const m=L.map(id,{zoomControl:true,scrollWheelZoom:false,dragging:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false,touchZoom:false});
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(m);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(m);
   m.fitBounds(ISRAEL_BOUNDS);
   return m;
 }
@@ -293,7 +308,7 @@ function buildHeatLayers(cells,color,addToMap,map){
   const maxC=Math.max(...cells.map(c=>c.count));
   return cells.map(cell=>{
     const lat=cell.grid_y*CELL_DEG,lng=cell.grid_x*CELL_DEG;
-    const alpha=0.15+(cell.count/maxC)*0.78;
+    const alpha=0.30+(cell.count/maxC)*0.65;
     const [r,g,b]=rgb;
     const l=L.rectangle([[lat,lng],[lat+CELL_DEG,lng+CELL_DEG]],{color:'transparent',fillColor:`rgba(${r},${g},${b},${alpha})`,fillOpacity:1,weight:0});
     if(addToMap)l.addTo(map);
@@ -304,7 +319,7 @@ function buildHeatLayers(cells,color,addToMap,map){
 function buildDistLayer(feat,color,addToMap,map){
   if(!feat)return null;
   const rgb=hexToRgb(color);
-  const l=L.geoJSON(feat,{style:{color,fillColor:`rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.15)`,fillOpacity:1,weight:2,opacity:.85}});
+  const l=L.geoJSON(feat,{style:{color,fillColor:`rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.15)`,fillOpacity:1,weight:3,opacity:1}});
   if(addToMap)l.addTo(map);
   return l;
 }
@@ -323,6 +338,33 @@ document.getElementById('togDist').addEventListener('change',function(){
   });
 });
 
+function applyCardLayout(count){
+  const grid=document.getElementById('cardsGrid');
+  if(!grid) return;
+  // Determine columns: 1→1, 2→2, 3→3, 4+→3 (wraps into rows of 3)
+  // Special case: 4 = 2 cols so it makes 2×2
+  let cols;
+  if(count===1) cols=1;
+  else if(count===2) cols=2;
+  else if(count===4) cols=2;
+  else cols=3;
+
+  const maxW=count===1?'500px':count===2?'900px':'100%';
+  grid.style.gridTemplateColumns=`repeat(${cols}, 1fr)`;
+  grid.style.maxWidth=maxW;
+
+  // Row note for 4+
+  const existing=document.getElementById('rowNote');
+  if(existing) existing.remove();
+  if(count>=4){
+    const note=document.createElement('div');
+    note.id='rowNote';
+    note.className='row-note';
+    note.textContent='💡 מומלץ לצלם מסך של כל שורה בנפרד';
+    grid.after(note);
+  }
+}
+
 async function buildCards(){
   const selected=allSpecies.filter(s=>selectedSpecies.has(s.scientific_name));
   if(!selected.length)return;
@@ -330,6 +372,7 @@ async function buildCards(){
   document.getElementById('emptyState').style.display='none';
   const grid=document.getElementById('cardsGrid');
   grid.style.display='grid';grid.innerHTML='';cardMaps={};
+  applyCardLayout(selected.length);
   await fetchGeoJSON();
   for(const sp of selected){
     setLoading(true,`בונה כרטיס: ${sp.common_name}...`);
@@ -392,6 +435,18 @@ async function init(){
       renderSidebar(document.getElementById('searchBox').value);
     });
     window.addEventListener('storage',e=>{if(e.key==='herp_color_change')renderSidebar(document.getElementById('searchBox').value);});
+    // Sidebar toggle
+    document.getElementById('sidebarToggle').addEventListener('click',()=>{
+      const sb=document.querySelector('.sidebar');
+      const btn=document.getElementById('sidebarToggle');
+      const collapsed=sb.classList.toggle('collapsed');
+      btn.textContent=collapsed?'▶ תפריט':'◀ תפריט';
+      // Re-apply card layout after sidebar width changes
+      setTimeout(()=>{
+        applyCardLayout(selectedSpecies.size);
+        Object.values(cardMaps).forEach(({map})=>map.invalidateSize());
+      },50);
+    });
   }catch(e){
     console.error('Init:',e);
     document.getElementById('emptyState').innerHTML=`<div class="big">⚠</div><div>שגיאה: ${e.message}</div>`;
