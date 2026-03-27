@@ -206,7 +206,7 @@ let activeLayers={};
 let selectedSpecies=new Set();
 
 const map=L.map('mainMap',{zoomControl:true,scrollWheelZoom:true}).fitBounds(ISRAEL_BOUNDS);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
 
 async function sbFetch(path){
   try{
