@@ -297,7 +297,7 @@ function updateSelCount(){
 
 function makeLeafletMap(id){
   const m=L.map(id,{zoomControl:true,scrollWheelZoom:false,dragging:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false,touchZoom:false});
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(m);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(m);
   m.fitBounds(ISRAEL_BOUNDS);
   return m;
 }
