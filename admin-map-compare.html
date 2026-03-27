@@ -117,14 +117,13 @@ input:checked+.slider:before{transform:translateX(15px);}
 .leaflet-control-attribution{display:none!important;}
 .leaflet-control-zoom a{background:#1e1e1e!important;color:#888!important;border-color:#333!important;}
 .leaflet-control-zoom a:hover{color:#c8922a!important;}
+
 .map-mode-toggle{
   background:none;border:1px solid var(--border);border-radius:6px;
   color:var(--text-mid);font-size:13px;padding:6px 10px;cursor:pointer;
   transition:all .15s;flex-shrink:0;
 }
 .map-mode-toggle:hover{border-color:var(--gold);color:var(--gold);}
-
-/* Light mode overrides scoped to #mainMap.map-light-mode */
 #mainMap.map-light-mode .leaflet-control-zoom a{
   background:#faf7f2!important;color:#6b5040!important;border-color:#d4c9b0!important;
 }
@@ -132,8 +131,7 @@ input:checked+.slider:before{transform:translateX(15px);}
   background:#f0ebe0!important;color:#c8922a!important;
 }
 #mainMap.map-light-mode .map-legend{
-  background:rgba(250,247,242,.95)!important;
-  border:1px solid #d4c9b0!important;
+  background:rgba(250,247,242,.95)!important;border:1px solid #d4c9b0!important;
 }
 #mainMap.map-light-mode .leg-title{color:#9a8070!important;}
 #mainMap.map-light-mode .leg-name{color:#3d2b1f!important;}
