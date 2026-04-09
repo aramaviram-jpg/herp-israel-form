@@ -1,7 +1,7 @@
 # Herp Israel Project - Comprehensive Guide
 
 **Complete Documentation for Wildlife Reporting System**
-Last Updated: March 2026
+Last Updated: April 2026
 
 ---
 
@@ -19,6 +19,7 @@ Last Updated: March 2026
 10. [Maintenance & Monitoring](#maintenance--monitoring)
 11. [Technical Reference](#technical-reference)
 12. [Troubleshooting](#troubleshooting)
+13. [Admin Comparison Tools](#admin-comparison-tools)
 
 ---
 
@@ -160,6 +161,8 @@ Community-driven citizen science platform for tracking reptile and amphibian sig
 - `admin.html` — Admin dashboard
 - `herp.geojson` — Species distribution polygons (94 species)
 - `vercel.json` — Deployment configuration (`{"version": 2}`)
+- `admin-species-cards.html` — Admin species comparison cards tool
+- `admin-map-compare.html` — Admin multi-species distribution map tool
 
 **Workflow:**
 1. Edit files on GitHub (web editor)
@@ -939,6 +942,82 @@ Monitor at: Supabase → Settings → Usage
 | `get_reports_for_archiving()` | Function | Returns reports eligible for archiving |
 | `archive-photos` | Edge Function | Photo archiving job |
 | `archive-photos-job` | Cron Job | Weekly schedule (Mondays 2AM UTC) |
+
+---
+
+## Admin Comparison Tools
+
+Two internal HTML tools for visualising and comparing species distribution data. Both are deployed to the Vercel repo root and accessible via URL. **They are not password protected — do not share URLs publicly.**
+
+**Desktop only:** Both tools block access on screens narrower than 1024px.
+
+---
+
+### Species Cards (`admin-species-cards.html`)
+
+**URL:** https://herp-israel-form.vercel.app/admin-species-cards.html
+
+Generates visual cards for any selection of species. Each card displays the Hebrew and Latin name plus a single map showing both the field sightings heatmap and the official IUCN distribution polygon overlaid, and the validated report count.
+
+**Card layout by species count:**
+
+| Selected | Layout |
+|----------|--------|
+| 1 | Centred, ~500px wide |
+| 2 | Side by side, centred |
+| 3 | Three equal columns |
+| 4 | 2 × 2 grid |
+| 5 | Row of 3 + row of 2 |
+| 6 | Two rows of 3 |
+
+For 4+ species a note is shown suggesting to screenshot each row separately.
+
+**Features:**
+- Searchable species list with checkboxes — selected species float to top
+- Colour picker per species (shared with compare map via `localStorage`)
+- Heatmap layer toggle and distribution layer toggle
+- Collapsible sidebar (◀ תפריט) for clean screenshotting
+- Light/dark basemap toggle (🌙 / ☀️) — preference saved to `localStorage`
+
+**Typical workflow for a Facebook post:**
+1. Select species → set colours → click צור כרטיסים
+2. Collapse sidebar → screenshot the cards area
+3. Post screenshot
+
+---
+
+### Map Compare (`admin-map-compare.html`)
+
+**URL:** https://herp-israel-form.vercel.app/admin-map-compare.html
+
+Displays multiple species simultaneously on one shared map. Each species is rendered in a distinct colour with both heatmap cells and distribution polygon.
+
+**Features:**
+- Searchable species list with checkboxes — selected species float to top
+- Colour picker per species (shared with cards page)
+- Heatmap and distribution toggles (independent)
+- Live legend showing species names and report counts
+- Light/dark basemap toggle — preference shared with cards page
+- Colour changes applied live without re-loading layers
+
+**Note on overlapping species:** Heatmap opacity is kept lower than on the cards page intentionally — this allows colours to blend gracefully in shared habitat zones rather than producing opaque overlapping blocks.
+
+---
+
+### Shared Technical Details
+
+**localStorage keys used:**
+
+| Key | Purpose |
+|-----|---------|
+| `herp_species_colors` | Colour assignment per species (scientific name → hex) |
+| `herp_map_mode` | Basemap preference: `'light'` or `'dark'` |
+
+Both keys are read on page load and written on change. Switching on one page does not live-update another already-open tab — preference takes effect on the next page load.
+
+**Data sources:** Same Supabase endpoints as the public page (`public_heatmap_grid`, `public_reports_safe`, `species` table) plus the `herp.geojson` served from repo root. Uses the anon key — same security profile as `public.html`.
+
+**Critical JS note:** In `admin-map-compare.html`, any constants or functions called during `L.map()` initialisation (including `getCurrentTile()`) must be declared before that line. `const`/`let` are not hoisted. Placing them after causes a silent `ReferenceError` that crashes the entire script.
 
 ---
 

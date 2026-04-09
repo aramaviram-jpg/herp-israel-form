@@ -1,7 +1,7 @@
 # Herp Israel Project - Quick Reference
 
 **Wildlife Reporting System for Israeli Reptiles & Amphibians**
-Last Updated: March 2026
+Last Updated: April 2026
 
 ---
 
@@ -12,6 +12,8 @@ Last Updated: March 2026
 | **Public Form** | https://herp-israel-form.vercel.app | Submit sightings |
 | **Public Page** | https://herp-israel-form.vercel.app/public.html | Stats, map, species cards |
 | **Admin Dashboard** | https://herp-israel-form.vercel.app/admin.html | Validate & edit reports |
+| **Admin Species Cards** | https://herp-israel-form.vercel.app/admin-species-cards.html | Species comparison cards (admin only) |
+| **Admin Map Compare** | https://herp-israel-form.vercel.app/admin-map-compare.html | Multi-species distribution map (admin only) |
 | **Supabase Console** | https://supabase.com/dashboard/project/qobayftqligpshmyweio | Database management |
 | **Cloudflare R2** | https://dash.cloudflare.com | Photo archive storage |
 | **Vercel Dashboard** | https://vercel.com | Website deployment |
@@ -217,6 +219,59 @@ const TEST_MODE = false;
 - **`true`:** Edit saves are blocked — shows a yellow warning and logs to console only
 
 If edits are not saving, check this flag is set to `false`.
+
+---
+
+## 🗂️ Admin Comparison Tools
+
+Two internal tools for visualising and comparing species distribution. **Desktop only (1024px+). Not for public sharing — URLs are not password protected.**
+
+### Species Cards — `admin-species-cards.html`
+
+Generates visual cards for selected species. Each card shows the Hebrew and Latin name, a map with field sightings (heatmap) and official IUCN distribution overlaid, and validated report count.
+
+**Use cases:**
+- Create side-by-side cards for a Facebook comparison post (e.g. the three black snakes)
+- Quick visual reference before a field season
+- Preparing materials for community discussions
+
+**How to use:**
+1. Search or scroll to find species — tick checkboxes to select
+2. Selected species float to the top of the list
+3. Click colour swatch to change a species' colour (shared with compare map)
+4. Toggle heatmap / distribution layers on or off
+5. Click **צור כרטיסים** to generate cards
+6. Click **◀ תפריט** to collapse the sidebar before screenshotting
+7. Click **🌙 מפה כהה / ☀️ מפה בהירה** to toggle map basemap
+
+**Card layout by species count:** 1 = centred, 2 = side by side, 3 = three columns, 4 = 2×2, 5 = 3+2, 6 = 3+3. For 4+ a note suggests screenshotting row by row.
+
+---
+
+### Map Compare — `admin-map-compare.html`
+
+Displays multiple species simultaneously on one shared map, each in a distinct colour.
+
+**Use cases:**
+- Compare overlapping distributions of similar species
+- Check whether field sightings align with official IUCN range data
+- Identify under-reported regions
+
+**How to use:**
+1. Search or scroll to select species — tick checkboxes
+2. Adjust colours via the colour swatches
+3. Click **החל על המפה** to render all selected species
+4. Toggle heatmap / distribution layers independently
+5. Click **נקה הכל** to clear all selections
+6. Click **🌙 מפה כהה / ☀️ מפה בהירה** to toggle basemap
+
+---
+
+### Shared Behaviour
+
+- **Colour palette** is shared between both tools via `localStorage` (`herp_species_colors`). Set a colour on one page and it persists on the other.
+- **Map mode** (light/dark) is also shared via `localStorage` (`herp_map_mode`).
+- Preference is applied on page load — switching on one tab does not live-update another already-open tab.
 
 ---
 
