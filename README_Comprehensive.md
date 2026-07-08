@@ -1156,6 +1156,13 @@ Both keys are read on page load and written on change. Switching on one page doe
 - Include browser console output (F12 → Console)
 - Describe the issue and what you expected to happen
 
+
+## One-Time Analyses
+
+One-time exploratory analyses (not permanent site features) are documented in separate files:
+
+- [`analysis-daboia-vs-hemorrhois-2026-07.md`](./analysis-daboia-vs-hemorrhois-2026-07.md) — Spatial distribution comparison between Daboia palaestinae (צפע מצוי) and Hemorrhois nummifer (זעמן מטבעות), including a check for correlation with elevation
+
 ---
 
 *For quick day-to-day reference, see README_Quick_Reference.md*
