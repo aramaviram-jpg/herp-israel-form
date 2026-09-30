@@ -321,7 +321,7 @@ function updateSelCount(){
 
 function makeLeafletMap(id){
   const m=L.map(id,{zoomControl:true,scrollWheelZoom:false,dragging:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false,touchZoom:false});
-  L.tileLayer(getCurrentTile(),{maxZoom:19}).addTo(m);
+  L.tileLayer(getCurrentTile(),{maxZoom:19,attribution:TILE_ATTR}).addTo(m);
   m.fitBounds(ISRAEL_BOUNDS);
   // Apply current mode to the container
   const container=document.getElementById(id)?.parentElement;
@@ -467,7 +467,7 @@ function applyMapMode(){
   // Update tile layers on all existing card maps
   Object.values(cardMaps).forEach(({map})=>{
     map.eachLayer(l=>{if(l._url)map.removeLayer(l);});
-    L.tileLayer(getCurrentTile(),{maxZoom:19}).addTo(map);
+    L.tileLayer(getCurrentTile(),{maxZoom:19,attribution:TILE_ATTR}).addTo(m);
   });
 }
 
