@@ -37,13 +37,13 @@
       position:absolute; left:0; top:0; transform:translate(-50%,-50%);
       width:max-content; max-width:9em; white-space:normal;
       text-align:center; line-height:1.15; pointer-events:none;
-      font-family:'Heebo',sans-serif; font-size:12px; font-weight:700;
-      direction:rtl; color:#f2ebde;
-      text-shadow:0 0 3px #111,0 0 3px #111,0 0 2px #111;
+      font-family:'Heebo',sans-serif; font-size:11.5px; font-weight:400;
+      direction:rtl; color:#d8cebd;
+      text-shadow:0 0 2px #0d0d0d,0 0 2px #0d0d0d,0 0 4px #0d0d0d;
     }
     .map-light-mode .herp-region-label {
-      color:#3d2b1f;
-      text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;
+      color:#4a3c2e;
+      text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 4px #fff;
     }`;
   const styleEl = document.createElement('style');
   styleEl.textContent = css;
