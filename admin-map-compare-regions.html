@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מפת השוואה — Herp Israel Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/regions-layer.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f0ebe0;
+  --surface:#faf7f2;
+  --surface2:#ede8dd;
+  --border:#d4c9b0;
+  --border-strong:#b8a888;
+  --gold:#c8922a;
+  --gold-dark:#a07020;
+  --text:#3d2b1f;
+  --text-mid:#6b5040;
+  --text-muted:#9a8070;
+  --sidebar:290px;
+}
+@media(max-width:1023px){
+  .mobile-block{display:flex!important;}
+  body>*:not(.mobile-block){display:none!important;}
+}
+.mobile-block{
+  display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;
+  flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:40px;font-family:'Heebo',sans-serif;color:var(--text);gap:16px;
+}
+.mobile-block .icon{font-size:48px;}
+.mobile-block h2{font-size:20px;font-weight:900;color:var(--gold);direction:rtl;}
+.mobile-block p{font-size:14px;color:var(--text-muted);direction:rtl;line-height:1.7;}
+
+body{background:var(--bg);font-family:'Heebo',sans-serif;color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+header{background:var(--surface);border-bottom:2px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:20px;flex-shrink:0;}
+.hbrand{font-size:13px;font-weight:700;color:var(--gold);direction:rtl;}
+.hbrand span{display:block;font-size:10px;font-weight:400;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;}
+.htitle{font-size:20px;font-weight:900;flex:1;direction:rtl;color:var(--text);}
+
+.workspace{display:flex;flex:1;overflow:hidden;}
+
+/* MAP — takes remaining space, dark basemap stays dark */
+#mainMap{flex:1;position:relative;}
+
+/* SIDEBAR */
+.sidebar{width:var(--sidebar);background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+.sbs{padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sbl{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;direction:rtl;}
+
+.search-box{width:100%;background:#fff;border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Heebo',sans-serif;font-size:13px;padding:7px 10px;direction:rtl;outline:none;transition:border-color .15s;}
+.search-box:focus{border-color:var(--gold);}
+.search-box::placeholder{color:var(--text-muted);}
+
+.sb-scroll{flex:1;overflow-y:auto;padding:8px 12px;min-height:0;}
+.sp-row{display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:6px;cursor:pointer;direction:rtl;transition:background .12s;margin-bottom:1px;}
+.sp-row:hover{background:var(--surface2);}
+.sp-row input[type=checkbox]{accent-color:var(--gold);width:14px;height:14px;flex-shrink:0;cursor:pointer;}
+.spn{flex:1;min-width:0;}
+.spn-he{font-size:13px;font-weight:600;direction:rtl;color:var(--text);}
+.spn-la{font-size:10px;font-style:italic;color:var(--text-muted);direction:ltr;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cswatch{width:13px;height:13px;border-radius:3px;flex-shrink:0;cursor:pointer;border:1px solid rgba(0,0,0,.18);transition:transform .1s;position:relative;}
+.cswatch:hover{transform:scale(1.35);}
+.cswatch input[type=color]{opacity:0;width:0;height:0;position:absolute;}
+
+.layer-row{display:flex;align-items:center;justify-content:space-between;direction:rtl;margin-bottom:8px;}
+.layer-row:last-child{margin-bottom:0;}
+.layer-label{font-size:12px;color:var(--text-mid);}
+.switch{position:relative;width:32px;height:17px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{position:absolute;inset:0;background:#ccc;border-radius:17px;cursor:pointer;transition:.2s;}
+.slider:before{content:'';position:absolute;width:11px;height:11px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+input:checked+.slider{background:var(--gold);}
+input:checked+.slider:before{transform:translateX(15px);}
+
+.btn-row{display:flex;gap:8px;}
+.apply-btn{flex:1;padding:9px;background:var(--gold);color:#fff;border:none;border-radius:7px;font-family:'Heebo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;direction:rtl;transition:background .15s;}
+.apply-btn:hover{background:var(--gold-dark);}
+.apply-btn:disabled{background:#ccc;color:#999;cursor:not-allowed;}
+.clear-btn{padding:9px 12px;background:none;color:var(--text-muted);border:1px solid var(--border);border-radius:7px;font-family:'Heebo',sans-serif;font-size:12px;cursor:pointer;direction:rtl;transition:all .15s;white-space:nowrap;}
+.clear-btn:hover{border-color:var(--border-strong);color:var(--text);}
+.sel-count{font-size:11px;color:var(--text-muted);direction:rtl;margin-top:8px;text-align:center;}
+
+/* Legend overlay on dark map */
+.map-legend{
+  position:absolute;bottom:20px;right:16px;z-index:1000;
+  background:rgba(15,12,8,.82);
+  border:1px solid rgba(200,146,42,.3);
+  border-radius:10px;padding:12px 14px;
+  direction:rtl;min-width:170px;pointer-events:none;
+  backdrop-filter:blur(4px);
+}
+.leg-title{font-size:9px;font-weight:700;letter-spacing:1.5px;color:#9a8070;text-transform:uppercase;margin-bottom:8px;}
+.leg-item{display:flex;align-items:center;gap:8px;margin-bottom:5px;direction:rtl;}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.leg-name{font-size:11px;direction:rtl;color:#ede8df;}
+.leg-cnt{font-size:10px;color:#7a7060;margin-right:auto;}
+.leg-divider{border:none;border-top:1px solid rgba(255,255,255,.1);margin:7px 0;}
+.leg-type{display:flex;align-items:center;gap:8px;font-size:10px;color:#7a7060;margin-bottom:3px;}
+.swatch-heat{width:16px;height:6px;border-radius:2px;background:rgba(255,255,255,.3);}
+.swatch-dist{width:16px;height:0;border-top:2px dashed rgba(255,255,255,.35);}
+.swatch-region{width:16px;height:0;border-top:1px solid rgba(230,220,203,.7);}
+
+/* Status bar */
+.status-bar{background:var(--surface);border-top:1px solid var(--border);padding:7px 16px;font-size:11px;color:var(--text-muted);direction:rtl;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.pulse{width:6px;height:6px;border-radius:50%;background:#6a9;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+.loading-overlay{position:fixed;inset:0;background:rgba(240,235,224,.9);z-index:5000;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;font-size:14px;color:var(--text);direction:rtl;}
+.loading-overlay.visible{display:flex;}
+.big-spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.leaflet-control-attribution{background:rgba(30,30,30,0.8)!important;color:#888!important;font-size:10px;}
+.leaflet-control-attribution a{color:#c8922a!important;}
+.leaflet-control-zoom a{background:#1e1e1e!important;color:#888!important;border-color:#333!important;}
+.leaflet-control-zoom a:hover{color:#c8922a!important;}
+
+.map-mode-toggle{
+  background:none;border:1px solid var(--border);border-radius:6px;
+  color:var(--text-mid);font-size:13px;padding:6px 10px;cursor:pointer;
+  transition:all .15s;flex-shrink:0;
+}
+.map-mode-toggle:hover{border-color:var(--gold);color:var(--gold);}
+#mainMap.map-light-mode .leaflet-control-zoom a{
+  background:#faf7f2!important;color:#6b5040!important;border-color:#d4c9b0!important;
+}
+#mainMap.map-light-mode .leaflet-control-zoom a:hover{
+  background:#f0ebe0!important;color:#c8922a!important;
+}
+#mainMap.map-light-mode .map-legend{
+  background:rgba(250,247,242,.95)!important;border:1px solid #d4c9b0!important;
+}
+#mainMap.map-light-mode .leg-title{color:#9a8070!important;}
+#mainMap.map-light-mode .leg-name{color:#3d2b1f!important;}
+#mainMap.map-light-mode .leg-cnt{color:#9a8070!important;}
+#mainMap.map-light-mode .leg-divider{border-top-color:#d4c9b0!important;}
+#mainMap.map-light-mode .leg-type{color:#9a8070!important;}
+#mainMap.map-light-mode .swatch-heat{background:rgba(0,0,0,.2)!important;}
+#mainMap.map-light-mode .swatch-dist{border-top-color:rgba(0,0,0,.3)!important;}
+#mainMap.map-light-mode .swatch-region{border-top-color:rgba(74,60,46,.75)!important;}
+</style>
+</head>
+<body>
+
+<div class="mobile-block">
+  <div class="icon">🖥</div>
+  <h2>כלי זה מיועד למחשב בלבד</h2>
+  <p>יש לפתוח את הדף במחשב שולחני או נייד.</p>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="big-spin"></div>
+  <span id="loadingMsg">טוען...</span>
+</div>
+
+<header>
+  <div>
+    <div class="hbrand">זוחלים ודו-חיים בישראל<span>Herpetology Israel · Admin</span></div>
+  </div>
+  <div class="htitle">מפת השוואת תפוצה</div>
+  <button class="map-mode-toggle" id="mapModeToggle">🌙 מפה כהה</button>
+</header>
+
+<div class="workspace">
+  <div id="mainMap">
+    <div class="map-legend" id="mapLegend">
+      <div class="leg-title">מינים מוצגים</div>
+      <div id="legendItems"></div>
+      <hr class="leg-divider">
+      <div class="leg-type"><div class="swatch-heat"></div><span>תצפיות שדה</span></div>
+      <div class="leg-type"><div class="swatch-dist"></div><span>תפוצה רשמית (IUCN)</span></div>
+      <div class="leg-type" id="legRegions" style="display:none"><div class="swatch-region"></div><span>גבולות אזורים</span></div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sbs">
+      <div class="sbl">חיפוש</div>
+      <input class="search-box" id="searchBox" type="text" placeholder="שם עברי או לטיני...">
+    </div>
+
+    <div class="sb-scroll" id="speciesList"></div>
+
+    <div class="sbs">
+      <div class="sbl">שכבות</div>
+      <div class="layer-row">
+        <span class="layer-label">תצפיות שדה</span>
+        <label class="switch"><input type="checkbox" id="togHeat" checked><span class="slider"></span></label>
+      </div>
+      <div class="layer-row">
+        <span class="layer-label">תפוצה רשמית</span>
+        <label class="switch"><input type="checkbox" id="togDist" checked><span class="slider"></span></label>
+      </div>
+      <div class="layer-row">
+        <span class="layer-label">אזורים</span>
+        <label class="switch"><input type="checkbox" id="togRegions"><span class="slider"></span></label>
+      </div>
+      <div class="layer-row">
+        <span class="layer-label">שמות אזורים</span>
+        <label class="switch"><input type="checkbox" id="togRegionLabels"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="sbs">
+      <div class="btn-row">
+        <button class="apply-btn" id="applyBtn" disabled>החל על המפה</button>
+        <button class="clear-btn" id="clearBtn">נקה הכל</button>
+      </div>
+      <div class="sel-count" id="selCount">לא נבחרו מינים</div>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="pulse"></div>
+  <span id="statusText">מתחבר...</span>
+  <span style="margin-right:auto;color:var(--border)">© 2026 זוחלים ודו-חיים בישראל</span>
+</div>
+
+<script>
+const SB_URL  = 'https://qobayftqligpshmyweio.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvYmF5ZnRxbGlncHNobXl3ZWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTEzMDcsImV4cCI6MjA4NzA4NzMwN30.u69AQLyyrXJvgBLTUO9ZpMvpd6dbqTDNj9Z_0RSctps';
+const GEOJSON_URL = 'https://herp-israel-form.vercel.app/herp.geojson';
+const ISRAEL_BOUNDS = [[29.4,34.2],[33.4,35.9]];
+const CELL_DEG = 10/111;
+const DEFAULT_COLORS = ['#4a90d9','#e05c3a','#7bc67a','#c97fd5','#e8a030','#5ecde0','#e07030','#8080e0','#e06080','#50b090'];
+
+function loadPalette(){try{return JSON.parse(localStorage.getItem('herp_species_colors')||'{}')}catch(e){return{}}}
+function savePalette(m){localStorage.setItem('herp_species_colors',JSON.stringify(m));}
+function getColor(sci,idx){const m=loadPalette();if(m[sci])return m[sci];const c=DEFAULT_COLORS[idx%DEFAULT_COLORS.length];m[sci]=c;savePalette(m);return c;}
+function setColor(sci,hex){const m=loadPalette();m[sci]=hex;savePalette(m);localStorage.setItem('herp_color_change',JSON.stringify({sci,hex,ts:Date.now()}));}
+function hexToRgb(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+
+let allSpecies=[], geojsonData=null, heatCache={};
+let showHeat=true, showDist=true;
+let activeLayers={};
+let selectedSpecies=new Set();
+
+const CARTO_KEY='cb1_44fn_1_94832226693feeb83aa87635';
+const TILE_LIGHT='https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png?key='+CARTO_KEY;
+const TILE_DARK='https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key='+CARTO_KEY;
+const TILE_ATTR='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+let mapMode=localStorage.getItem('herp_map_mode')||'light';
+function getCurrentTile(){return mapMode==='dark'?TILE_DARK:TILE_LIGHT;}
+
+const map=L.map('mainMap',{zoomControl:true,scrollWheelZoom:true}).fitBounds(ISRAEL_BOUNDS);
+L.tileLayer(getCurrentTile(),{maxZoom:19,attribution:TILE_ATTR}).addTo(map);
+const regionsCtl=HerpRegions.attach(map);
+
+async function sbFetch(path){
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/${path}`,{headers:{'apikey':SB_ANON,'Accept':'application/json'}});
+    if(!r.ok){console.error('SB',r.status,await r.text());return[];}
+    const d=await r.json();return Array.isArray(d)?d:[];
+  }catch(e){console.error('sbFetch:',e);return[];}
+}
+async function loadSpecies(){
+  const d=await sbFetch('species?select=id,common_name,scientific_name&order=common_name');
+  return d.filter(s=>s.common_name!=='לא מזוהה'&&!s.common_name.includes('(סוג)')&&s.scientific_name.trim().split(/\s+/).length>=2);
+}
+async function fetchGeoJSON(){
+  if(geojsonData)return geojsonData;
+  const r=await fetch(GEOJSON_URL);geojsonData=await r.json();return geojsonData;
+}
+async function fetchHeatmap(id){
+  if(heatCache[id])return heatCache[id];
+  const d=await sbFetch(`public_heatmap_grid?species_id=eq.${id}&select=grid_x,grid_y,count`);
+  heatCache[id]=d;return d;
+}
+async function fetchCount(id){
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/public_reports_safe?species_id=eq.${id}&select=id`,
+      {headers:{'apikey':SB_ANON,'Accept':'application/json','Prefer':'count=exact','Range':'0-0'}});
+    const cr=r.headers.get('content-range');return cr?parseInt(cr.split('/')[1])||0:0;
+  }catch(e){return 0;}
+}
+function findGeoFeature(sci){
+  if(!geojsonData)return null;
+  const p=sci.trim().split(/\s+/);const bin=`${p[0]} ${p[1]}`;
+  return geojsonData.features.find(f=>(f.properties?.binomial||'').toLowerCase()===bin.toLowerCase())||null;
+}
+
+function renderSidebar(query=''){
+  const q=query.trim().toLowerCase();
+  const checked=selectedSpecies;
+  let filtered=q?allSpecies.filter(s=>s.common_name.includes(q)||s.scientific_name.toLowerCase().includes(q)):allSpecies.slice();
+  // Float selected to top, alphabetical within each group
+  filtered.sort((a,b)=>{
+    const ac=checked.has(a.scientific_name)?0:1;
+    const bc=checked.has(b.scientific_name)?0:1;
+    if(ac!==bc)return ac-bc;
+    return a.common_name.localeCompare(b.common_name,'he');
+  });
+  const list=document.getElementById('speciesList');
+  list.innerHTML='';
+  filtered.forEach(s=>{
+    const idx=allSpecies.indexOf(s);
+    const color=getColor(s.scientific_name,idx);
+    const row=document.createElement('div');
+    row.className='sp-row';
+    row.innerHTML=`
+      <input type="checkbox" id="cb_${s.id}" data-sci="${s.scientific_name}" ${checked.has(s.scientific_name)?'checked':''}>
+      <div class="spn"><div class="spn-he">${s.common_name}</div><div class="spn-la">${s.scientific_name}</div></div>
+      <div class="cswatch" style="background:${color}"><input type="color" value="${color}" data-sci="${s.scientific_name}"></div>
+    `;
+    row.querySelector('input[type=checkbox]').addEventListener('change',function(){
+      if(this.checked) selectedSpecies.add(s.scientific_name);
+      else selectedSpecies.delete(s.scientific_name);
+      updateSelCount();
+      renderSidebar(document.getElementById('searchBox').value);
+    });
+    const sw=row.querySelector('.cswatch'),ci=row.querySelector('input[type=color]');
+    sw.addEventListener('click',e=>{e.stopPropagation();ci.click();});
+    ci.addEventListener('input',e=>{sw.style.background=e.target.value;setColor(s.scientific_name,e.target.value);});
+    ci.addEventListener('change',e=>setColor(s.scientific_name,e.target.value));
+    list.appendChild(row);
+  });
+  updateSelCount();
+}
+
+function getCheckedSet(){return selectedSpecies;}
+function updateSelCount(){
+  const n=selectedSpecies.size;
+  document.getElementById('selCount').textContent=n===0?'לא נבחרו מינים':`${n} מינים נבחרו`;
+  document.getElementById('applyBtn').disabled=n===0;
+}
+
+function clearAllLayers(){
+  Object.values(activeLayers).forEach(({heatLayers,distLayer})=>{
+    heatLayers.forEach(l=>{try{map.removeLayer(l)}catch(e){}});
+    if(distLayer)try{map.removeLayer(distLayer)}catch(e){}
+  });
+  activeLayers={};
+}
+
+function addHeat(cells,color){
+  if(!cells||!cells.length)return[];
+  const rgb=hexToRgb(color);const maxC=Math.max(...cells.map(c=>c.count));
+  return cells.map(cell=>{
+    const lat=cell.grid_y*CELL_DEG,lng=cell.grid_x*CELL_DEG;
+    const alpha=0.15+(cell.count/maxC)*0.78;const [r,g,b]=rgb;
+    const l=L.rectangle([[lat,lng],[lat+CELL_DEG,lng+CELL_DEG]],{color:'transparent',fillColor:`rgba(${r},${g},${b},${alpha})`,fillOpacity:1,weight:0});
+    if(showHeat)l.addTo(map);return l;
+  });
+}
+
+function addDist(feat,color){
+  if(!feat)return null;
+  const rgb=hexToRgb(color);
+  const l=L.geoJSON(feat,{style:{color,fillColor:`rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.15)`,fillOpacity:1,weight:3,opacity:1,dashArray:'6,4'}});
+  if(showDist)l.addTo(map);return l;
+}
+
+function renderLegend(){
+  const el=document.getElementById('legendItems');el.innerHTML='';
+  Object.values(activeLayers).forEach(({color,hebrewName,count})=>{
+    const d=document.createElement('div');d.className='leg-item';
+    d.innerHTML=`<div class="leg-dot" style="background:${color}"></div><span class="leg-name">${hebrewName}</span><span class="leg-cnt">${count} תצ׳</span>`;
+    el.appendChild(d);
+  });
+}
+
+document.getElementById('togHeat').addEventListener('change',function(){
+  showHeat=this.checked;
+  Object.values(activeLayers).forEach(({heatLayers})=>{
+    heatLayers.forEach(l=>{if(showHeat)l.addTo(map);else try{map.removeLayer(l)}catch(e){}});
+  });
+});
+document.getElementById('togDist').addEventListener('change',function(){
+  showDist=this.checked;
+  Object.values(activeLayers).forEach(({distLayer})=>{
+    if(!distLayer)return;
+    if(showDist)distLayer.addTo(map);else try{map.removeLayer(distLayer)}catch(e){}
+  });
+});
+function setRegionOutlines(on){
+  HerpRegions.setPref('outlines',on);
+  regionsCtl.setOutlines(on);
+  document.getElementById('legRegions').style.display=on?'':'none';
+}
+function setRegionLabels(on){
+  HerpRegions.setPref('labels',on);
+  regionsCtl.setLabels(on);
+}
+document.getElementById('togRegions').addEventListener('change',function(){setRegionOutlines(this.checked);});
+document.getElementById('togRegionLabels').addEventListener('change',function(){setRegionLabels(this.checked);});
+// apply saved switch states on load
+document.getElementById('togRegions').checked=HerpRegions.getPref('outlines');
+document.getElementById('togRegionLabels').checked=HerpRegions.getPref('labels');
+setRegionOutlines(HerpRegions.getPref('outlines'));
+setRegionLabels(HerpRegions.getPref('labels'));
+
+async function applyToMap(){
+  const selected=allSpecies.filter(s=>selectedSpecies.has(s.scientific_name));
+  if(!selected.length)return;
+  setLoading(true,'מנקה שכבות...');
+  clearAllLayers();
+  await fetchGeoJSON();
+  for(const sp of selected){
+    setLoading(true,`טוען: ${sp.common_name}...`);
+    const idx=allSpecies.indexOf(sp);
+    const color=getColor(sp.scientific_name,idx);
+    const [cells,count]=await Promise.all([fetchHeatmap(sp.id),fetchCount(sp.id)]);
+    const feat=findGeoFeature(sp.scientific_name);
+    activeLayers[sp.id]={heatLayers:addHeat(cells,color),distLayer:addDist(feat,color),color,hebrewName:sp.common_name,count};
+  }
+  renderLegend();
+  document.getElementById('statusText').textContent=`${Object.keys(activeLayers).length} מינים מוצגים`;
+  setLoading(false);
+}
+
+function setLoading(on,msg=''){
+  document.getElementById('loadingOverlay').classList.toggle('visible',on);
+  if(msg)document.getElementById('loadingMsg').textContent=msg;
+}
+
+function applyMapMode(){
+  const isDark=mapMode==='dark';
+  document.getElementById('mapModeToggle').textContent=isDark?'☀️ מפה בהירה':'🌙 מפה כהה';
+  document.getElementById('mainMap').classList.toggle('map-light-mode',!isDark);
+  map.eachLayer(l=>{if(l._url)map.removeLayer(l);});
+    L.tileLayer(getCurrentTile(),{maxZoom:19,attribution:TILE_ATTR}).addTo(map);
+}
+
+async function init(){
+  setLoading(true,'טוען רשימת מינים...');
+  try{
+    allSpecies=await loadSpecies();
+    if(!allSpecies.length){document.getElementById('statusText').textContent='שגיאה: לא ניתן לטעון מינים';return;}
+    renderSidebar();
+    document.getElementById('searchBox').addEventListener('input',e=>renderSidebar(e.target.value));
+    document.getElementById('applyBtn').addEventListener('click',applyToMap);
+    document.getElementById('clearBtn').addEventListener('click',()=>{
+      selectedSpecies.clear();
+      renderSidebar(document.getElementById('searchBox').value);
+    });
+    window.addEventListener('storage',e=>{
+      if(e.key==='herp_color_change'){
+        renderSidebar(document.getElementById('searchBox').value);
+        try{
+          const {sci,hex}=JSON.parse(e.newValue||'{}');
+          const sp=allSpecies.find(s=>s.scientific_name===sci);
+          if(sp&&activeLayers[sp.id]){
+            const entry=activeLayers[sp.id];
+            entry.heatLayers.forEach(l=>{try{map.removeLayer(l)}catch(e){}});
+            if(entry.distLayer)try{map.removeLayer(entry.distLayer)}catch(e){}
+            const cells=heatCache[sp.id]||[];
+            const feat=findGeoFeature(sp.scientific_name);
+            entry.color=hex;entry.heatLayers=addHeat(cells,hex);entry.distLayer=addDist(feat,hex);
+            renderLegend();
+          }
+        }catch(e){}
+      }
+    });
+    document.getElementById('statusText').textContent='מוכן · בחר מינים ולחץ "החל על המפה"';
+    document.getElementById('mapModeToggle').addEventListener('click',()=>{
+      mapMode=mapMode==='light'?'dark':'light';
+      localStorage.setItem('herp_map_mode',mapMode);
+      applyMapMode();
+    });
+    applyMapMode();
+  }catch(e){
+    console.error('Init:',e);
+    document.getElementById('statusText').textContent='שגיאה: '+e.message;
+  }finally{setLoading(false);}
+}
+init();
+</script>
+</body>
+</html>
