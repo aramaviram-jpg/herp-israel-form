@@ -32,8 +32,11 @@
 
     .herp-region-label-icon { background:none; border:none; }
     .herp-region-label {
-      position:absolute; transform:translate(-50%,-50%);
-      white-space:nowrap; pointer-events:none;
+      /* left/top pinned explicitly: in an RTL page an unpinned absolute
+         element anchors by its right edge, which shifted labels west */
+      position:absolute; left:0; top:0; transform:translate(-50%,-50%);
+      width:max-content; max-width:9em; white-space:normal;
+      text-align:center; line-height:1.15; pointer-events:none;
       font-family:'Heebo',sans-serif; font-size:12px; font-weight:700;
       direction:rtl; color:#f2ebde;
       text-shadow:0 0 3px #111,0 0 3px #111,0 0 2px #111;
@@ -74,13 +77,36 @@
     }
   }
 
+  function ringArea(r) {           // rough, only used to rank regions
+    let a = 0;
+    for (let i = 0; i < r.length - 1; i++) a += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1];
+    return Math.abs(a / 2);
+  }
+
   // ── Per-map controller ────────────────────────────────────────
   function attach(map) {
     ensurePane(map, 'herpRegionsPane', 350);      // below overlays (400)
     ensurePane(map, 'herpRegionLabelsPane', 450); // above overlays, below markers (600)
 
     const want = { outlines: false, labels: false };
-    let outlineLayer = null, labelLayer = null;
+    let outlineLayer = null, labelLayer = null, labelItems = [];
+
+    // Hide labels that would overlap a label of a larger region.
+    // Re-run after every zoom, so zooming in reveals more names.
+    function declutter() {
+      if (!labelLayer || !map.hasLayer(labelLayer)) return;
+      const kept = [], pad = 3;
+      labelItems.forEach(item => {
+        const el = item.marker.getElement() && item.marker.getElement().querySelector('.herp-region-label');
+        if (!el) return;
+        el.style.visibility = 'visible';
+        const r = el.getBoundingClientRect();
+        const hit = kept.some(k => !(r.right + pad < k.left || r.left - pad > k.right ||
+                                     r.bottom + pad < k.top || r.top - pad > k.bottom));
+        if (hit) el.style.visibility = 'hidden'; else kept.push(r);
+      });
+    }
+    map.on('zoomend resize', declutter);
 
     async function sync() {
       if (!want.outlines && !want.labels) { apply(); return; }
@@ -95,18 +121,23 @@
         });
       }
       if (!labelLayer) {
-        labelLayer = L.layerGroup(data.features
+        labelItems = data.features
           .filter(f => Array.isArray(f.properties.label))
-          .map(f => L.marker([f.properties.label[1], f.properties.label[0]], {
-            pane: 'herpRegionLabelsPane',
-            interactive: false,
-            keyboard: false,
-            icon: L.divIcon({
-              className: 'herp-region-label-icon',
-              iconSize: [0, 0],
-              html: `<span class="herp-region-label">${f.properties.name_he}</span>`
+          .map(f => ({
+            area: ringArea(f.geometry.coordinates[0]),
+            marker: L.marker([f.properties.label[1], f.properties.label[0]], {
+              pane: 'herpRegionLabelsPane',
+              interactive: false,
+              keyboard: false,
+              icon: L.divIcon({
+                className: 'herp-region-label-icon',
+                iconSize: [0, 0],
+                html: `<span class="herp-region-label">${f.properties.name_he}</span>`
+              })
             })
-          })));
+          }))
+          .sort((a, b) => b.area - a.area);   // larger regions win overlaps
+        labelLayer = L.layerGroup(labelItems.map(i => i.marker));
         labelLayer.getAttribution = () => ATTRIBUTION; // credit shown with labels only, too
       }
       apply();
@@ -118,7 +149,7 @@
         if (!want.outlines && map.hasLayer(outlineLayer)) map.removeLayer(outlineLayer);
       }
       if (labelLayer) {
-        if (want.labels && !map.hasLayer(labelLayer)) labelLayer.addTo(map);
+        if (want.labels && !map.hasLayer(labelLayer)) { labelLayer.addTo(map); declutter(); }
         if (!want.labels && map.hasLayer(labelLayer)) map.removeLayer(labelLayer);
       }
     }
