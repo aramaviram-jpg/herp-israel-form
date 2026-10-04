@@ -283,6 +283,11 @@ footer a:hover{text-decoration:underline}
 /* LEAFLET POPUP */
 .leaflet-popup-content-wrapper{background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Heebo',sans-serif;direction:rtl;font-size:0.85rem}
 .leaflet-popup-tip{background:var(--surface)}
+/* REGIONS LAYER TOGGLE */
+.regions-toggle{background:var(--surface);color:var(--text);border:none;font-family:'Heebo',sans-serif;font-size:0.8rem;font-weight:500;padding:0.35rem 0.7rem;cursor:pointer;line-height:1.4;display:block}
+.regions-toggle:hover{background:var(--bg2)}
+.regions-toggle.active{background:var(--bg3);font-weight:700}
+.regions-toggle:disabled{opacity:0.6;cursor:wait}
 </style>
 </head>
 <body>
@@ -417,7 +422,6 @@ footer a:hover{text-decoration:underline}
 <!-- FOOTER -->
 <footer>
   <p>© 2026 זוחלים ודו-חיים בישראל &nbsp;·&nbsp; הנתונים באתר אסורים לשימוש חוזר ללא רשות &nbsp;·&nbsp;
-     <a href="/cdn-cgi/l/email-protection#214053404c0f40574853404c61464c40484d0f424e4c"><span class="__cf_email__" data-cfemail="78190a191556190e110a1915381f15191114561b1715">[email&#160;protected]</span></a> &nbsp;·&nbsp;
      <a href="https://herp-israel-form.vercel.app">הגש תצפית חדשה</a>
   </p>
   <p style="font-size:0.75rem;opacity:0.7;margin-top:0.3rem;">
@@ -473,10 +477,71 @@ async function loadDistribution(scientificName) {
   if (!feature) return;
 
   distributionLayer = L.geoJSON(feature, {
-    style: { color: '#2a6a3a', weight: 1, fillColor: '#4aaa5a', fillOpacity: 0.25 }
+    style: { color: '#2a6a3a', weight: 1, fillColor: '#4aaa5a', fillOpacity: 0.25 },
+    interactive: false   // no popup of its own; lets clicks reach the regions layer below
   }).addTo(map);
   distributionLayer.bringToBack();
 }
+
+// ── REGIONS LAYER (optional outlines, off by default) ────────
+// Region outlines only — no sighting data. Loaded on first use, then cached.
+// Own pane below the overlay pane, so heatmap cells and the
+// distribution layer always stay on top and keep their clicks.
+map.createPane('regionsPane');
+map.getPane('regionsPane').style.zIndex = 350;
+
+let regionsLayer = null;
+let regionsCache = null;
+
+const REGION_STYLE = { pane: 'regionsPane', color: '#5a4a3a', weight: 1.3, opacity: 0.8,
+                       dashArray: '4 3', fill: true, fillColor: '#5a4a3a', fillOpacity: 0 };
+
+async function toggleRegions(btn) {
+  if (regionsLayer) {
+    map.removeLayer(regionsLayer);
+    regionsLayer = null;
+    btn.classList.remove('active');
+    return;
+  }
+  if (!regionsCache) {
+    btn.disabled = true; btn.textContent = 'טוען...';
+    try {
+      const res = await fetch('/israel-regions.geojson');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      regionsCache = await res.json();
+    } catch (e) {
+      console.error('[regions] fetch error:', e);
+    } finally {
+      btn.disabled = false; btn.textContent = 'אזורים';
+    }
+    if (!regionsCache) return;
+  }
+  regionsLayer = L.geoJSON(regionsCache, {
+    style: REGION_STYLE,
+    attribution: 'אזורים: מותאם מ-Fauna Palaestina',
+    onEachFeature: (f, layer) => {
+      layer.bindPopup(`<b>${f.properties.name_he}</b>`);
+      layer.on('mouseover', () => layer.setStyle({ weight: 2.5, fillOpacity: 0.08 }));
+      layer.on('mouseout',  () => layer.setStyle({ weight: REGION_STYLE.weight, fillOpacity: 0 }));
+    }
+  }).addTo(map);
+  btn.classList.add('active');
+}
+
+const RegionsControl = L.Control.extend({
+  options: { position: 'topright' },
+  onAdd: function () {
+    const wrap = L.DomUtil.create('div', 'leaflet-bar');
+    const btn = L.DomUtil.create('button', 'regions-toggle', wrap);
+    btn.type = 'button';
+    btn.textContent = 'אזורים';
+    btn.title = 'הצג / הסתר גבולות אזורים זואוגאוגרפיים';
+    L.DomEvent.disableClickPropagation(wrap);
+    L.DomEvent.on(btn, 'click', () => toggleRegions(btn));
+    return wrap;
+  }
+});
+new RegionsControl().addTo(map);
 
 function drawHeatmap(data) {
   clearHeat();
