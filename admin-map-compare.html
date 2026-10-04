@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/regions-layer.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -103,6 +104,7 @@ input:checked+.slider:before{transform:translateX(15px);}
 .leg-type{display:flex;align-items:center;gap:8px;font-size:10px;color:#7a7060;margin-bottom:3px;}
 .swatch-heat{width:16px;height:6px;border-radius:2px;background:rgba(255,255,255,.3);}
 .swatch-dist{width:16px;height:0;border-top:2px dashed rgba(255,255,255,.35);}
+.swatch-region{width:16px;height:0;border-top:1px solid rgba(230,220,203,.7);}
 
 /* Status bar */
 .status-bar{background:var(--surface);border-top:1px solid var(--border);padding:7px 16px;font-size:11px;color:var(--text-muted);direction:rtl;display:flex;align-items:center;gap:12px;flex-shrink:0;}
@@ -141,6 +143,7 @@ input:checked+.slider:before{transform:translateX(15px);}
 #mainMap.map-light-mode .leg-type{color:#9a8070!important;}
 #mainMap.map-light-mode .swatch-heat{background:rgba(0,0,0,.2)!important;}
 #mainMap.map-light-mode .swatch-dist{border-top-color:rgba(0,0,0,.3)!important;}
+#mainMap.map-light-mode .swatch-region{border-top-color:rgba(74,60,46,.75)!important;}
 </style>
 </head>
 <body>
@@ -172,6 +175,7 @@ input:checked+.slider:before{transform:translateX(15px);}
       <hr class="leg-divider">
       <div class="leg-type"><div class="swatch-heat"></div><span>תצפיות שדה</span></div>
       <div class="leg-type"><div class="swatch-dist"></div><span>תפוצה רשמית (IUCN)</span></div>
+      <div class="leg-type" id="legRegions" style="display:none"><div class="swatch-region"></div><span>גבולות אזורים</span></div>
     </div>
   </div>
 
@@ -192,6 +196,14 @@ input:checked+.slider:before{transform:translateX(15px);}
       <div class="layer-row">
         <span class="layer-label">תפוצה רשמית</span>
         <label class="switch"><input type="checkbox" id="togDist" checked><span class="slider"></span></label>
+      </div>
+      <div class="layer-row">
+        <span class="layer-label">אזורים</span>
+        <label class="switch"><input type="checkbox" id="togRegions"><span class="slider"></span></label>
+      </div>
+      <div class="layer-row">
+        <span class="layer-label">שמות אזורים</span>
+        <label class="switch"><input type="checkbox" id="togRegionLabels"><span class="slider"></span></label>
       </div>
     </div>
 
@@ -239,6 +251,7 @@ function getCurrentTile(){return mapMode==='dark'?TILE_DARK:TILE_LIGHT;}
 
 const map=L.map('mainMap',{zoomControl:true,scrollWheelZoom:true}).fitBounds(ISRAEL_BOUNDS);
 L.tileLayer(getCurrentTile(),{maxZoom:19,attribution:TILE_ATTR}).addTo(map);
+const regionsCtl=HerpRegions.attach(map);
 
 async function sbFetch(path){
   try{
@@ -366,6 +379,22 @@ document.getElementById('togDist').addEventListener('change',function(){
     if(showDist)distLayer.addTo(map);else try{map.removeLayer(distLayer)}catch(e){}
   });
 });
+function setRegionOutlines(on){
+  HerpRegions.setPref('outlines',on);
+  regionsCtl.setOutlines(on);
+  document.getElementById('legRegions').style.display=on?'':'none';
+}
+function setRegionLabels(on){
+  HerpRegions.setPref('labels',on);
+  regionsCtl.setLabels(on);
+}
+document.getElementById('togRegions').addEventListener('change',function(){setRegionOutlines(this.checked);});
+document.getElementById('togRegionLabels').addEventListener('change',function(){setRegionLabels(this.checked);});
+// apply saved switch states on load
+document.getElementById('togRegions').checked=HerpRegions.getPref('outlines');
+document.getElementById('togRegionLabels').checked=HerpRegions.getPref('labels');
+setRegionOutlines(HerpRegions.getPref('outlines'));
+setRegionLabels(HerpRegions.getPref('labels'));
 
 async function applyToMap(){
   const selected=allSpecies.filter(s=>selectedSpecies.has(s.scientific_name));
