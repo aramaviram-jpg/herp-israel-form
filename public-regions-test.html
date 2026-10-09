@@ -735,10 +735,13 @@ function renderRegions() {
   regionLegend.onAdd = () => {
     const d = L.DomUtil.create('div', 'region-legend');
     if (presence) {
-      d.innerHTML = `<div class="t">${name}</div>` +
-        `<div class="r"><span class="sw" style="background:rgba(168,113,31,0.55);border:1px solid #6f4512"></span>תועד באזור</div>` +
-        `<div class="r"><span class="sw" style="border:1px dashed #8a7a66"></span>לא תועד</div>` +
-        (distributionLayer ? `<div class="r"><span class="sw" style="background:rgba(74,170,90,0.35);border:1px solid #2a6a3a"></span>תחום תפוצה</div>` : '');
+      // Brown region fill and the green range overlay mix to olive where they overlap
+      d.innerHTML = `<div class="t">${name}</div>` + (distributionLayer
+        ? `<div class="r"><span class="sw" style="background:#aeaf79;border:1px solid #6f4512"></span>תועד בתחום התפוצה</div>` +
+          `<div class="r"><span class="sw" style="background:rgba(168,113,31,0.55);border:1px solid #6f4512"></span>תועד מחוץ לתחום התפוצה</div>` +
+          `<div class="r"><span class="sw" style="background:rgba(74,170,90,0.35);border:1px solid #2a6a3a"></span>תחום תפוצה</div>`
+        : `<div class="r"><span class="sw" style="background:rgba(168,113,31,0.55);border:1px solid #6f4512"></span>תועד באזור</div>`) +
+        `<div class="r"><span class="sw" style="border:1px dashed #8a7a66"></span>לא תועד</div>`;
     } else {
       d.innerHTML = `<div class="t">מספר מינים שתועדו</div>` +
         RICH_BINS.slice().reverse().map(([lo, hi, c]) =>
