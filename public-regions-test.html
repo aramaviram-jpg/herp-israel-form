@@ -289,7 +289,8 @@ footer a:hover{text-decoration:underline}
 .regions-toggle.active{background:var(--bg3);font-weight:700}
 .regions-toggle:disabled{opacity:0.6;cursor:wait}
 /* regions mode (test) */
-.map-mode-ctl{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.map-mode-ctl{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+@media (max-width:600px){.regions-toggle{font-size:0.72rem;padding:0.25rem 0.5rem}.region-legend{font-size:10.5px;padding:5px 7px;max-width:150px}}
 .mode-bar{display:flex}
 .mode-bar .regions-toggle{display:inline-block}
 .mode-bar .regions-toggle + .regions-toggle{border-right:1px solid var(--bg3)}
@@ -539,7 +540,7 @@ async function toggleRegions(btn) {
 }
 
 const RegionsControl = L.Control.extend({
-  options: { position: 'topright' },
+  options: { position: 'topleft' },   // west side = sea, keeps the north-east data visible
   onAdd: function () {
     const wrap = L.DomUtil.create('div', 'map-mode-ctl');
     const mk = (parent, label, title) => {
