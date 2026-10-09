@@ -605,7 +605,7 @@ let mapMode = 'grid';
 let lastHeatData = null;
 let outlinesWereOn = false;
 let regionFillLayer = null, regionLegend = null;
-let regionCounts = null, regionSpecies = null;
+let regionCounts = null, regionSpecies = null, regionExpected = null;
 
 map.createPane('regionFillPane');
 map.getPane('regionFillPane').style.zIndex = 360;   // above outlines, below heat/distribution
@@ -629,6 +629,18 @@ async function loadRegionData() {
       sb.from('public_region_counts').select('region_id,species_id,report_count')
         .order('region_id').order('species_id')
     );
+  }
+  if (!regionExpected) {
+    // Expected species per region (static file from the regions analysis).
+    // Optional: if missing, the page simply omits the "expected" wording.
+    try {
+      const res = await fetch('/expected-by-region.json');
+      if (res.ok) {
+        const j = await res.json();
+        regionExpected = {};
+        Object.entries(j.regions || {}).forEach(([rid, list]) => { regionExpected[rid] = new Set(list); });
+      }
+    } catch (e) { console.warn('[regions mode] expected list not loaded:', e); }
   }
   if (!regionSpecies) {
     const { data, error } = await sb.from('species').select('id,common_name,scientific_name,family');
@@ -674,6 +686,7 @@ function renderRegions() {
 
   const sel = document.getElementById('species-select');
   const name = sel.value;
+  const selSci = name ? (sel.options[sel.selectedIndex].dataset.sci || '').trim().split(/\s+/).slice(0, 2).join(' ') : '';
   let presence = null;
   if (name) {
     const ids = new Set((nameToIds[name] || []).map(String));
@@ -704,11 +717,14 @@ function renderRegions() {
       let html;
       if (presence) {
         const n = presence[id] || 0;
+        const expected = regionExpected && regionExpected[id] && regionExpected[id].has(selSci);
         html = n ? `<b>${rn}</b><br>${name}: ${fmtN(n)}`
-                 : `<b>${rn}</b><br>${name} לא תועד באזור זה`;
+           : expected ? `<b>${rn}</b><br>המין ${name} צפוי באזור זה לפי מפות התפוצה, אך טרם תועד`
+                      : `<b>${rn}</b><br>המין ${name} לא תועד באזור זה`;
       } else {
         const s = stats[id] || { S: 0, N: 0, low: true };
-        html = `<b>${rn}</b><br>${s.S} מינים · ${fmtN(s.N)} מאומתות` +
+        const E = regionExpected && regionExpected[id] ? regionExpected[id].size : null;
+        html = `<b>${rn}</b><br>${s.S} מינים${E ? ` מתוך ${E} צפויים` : ''} · ${fmtN(s.N)} מאומתות` +
                (s.low ? `<br><span style="color:#8a7a66">מעט תצפיות — התמונה חלקית</span>` : '');
       }
       layer.bindPopup(html);
