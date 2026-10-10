@@ -288,6 +288,17 @@ footer a:hover{text-decoration:underline}
 .regions-toggle:hover{background:var(--bg2)}
 .regions-toggle.active{background:var(--bg3);font-weight:700}
 .regions-toggle:disabled{opacity:0.6;cursor:wait}
+/* regions mode (test) */
+.map-mode-ctl{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+@media (max-width:600px){.regions-toggle{font-size:0.72rem;padding:0.25rem 0.5rem}.region-legend{font-size:10.5px;padding:5px 7px;max-width:150px}}
+.mode-bar{display:flex}
+.mode-bar .regions-toggle{display:inline-block}
+.mode-bar .regions-toggle + .regions-toggle{border-right:1px solid var(--bg3)}
+.region-legend{background:rgba(255,255,255,0.93);padding:6px 9px;border-radius:4px;font-family:'Heebo',sans-serif;font-size:11.5px;line-height:1.55;direction:rtl;text-align:right;box-shadow:0 1px 4px rgba(0,0,0,0.2);max-width:180px;color:var(--text)}
+.region-legend .t{font-weight:700;margin-bottom:2px}
+.region-legend .r{display:flex;align-items:center;gap:6px}
+.region-legend .sw{width:14px;height:10px;border-radius:2px;display:inline-block;flex:none}
+.region-legend .n{color:var(--stone);font-size:10.5px;margin-top:3px}
 </style>
 </head>
 <body>
@@ -353,7 +364,7 @@ footer a:hover{text-decoration:underline}
       </select>
     </div>
     <div id="map"></div>
-    <div class="map-note">🔒 המפה מציגה צפיפות תצפיות בריבועים של כ-10 קמ״ר · מיקומים מדויקים אינם מוצגים לציבור</div>
+    <div class="map-note" id="map-note">🔒 המפה מציגה צפיפות תצפיות בריבועים של כ-10 ק״מ · מיקומים מדויקים אינם מוצגים לציבור</div>
   </div>
 
   <div class="sidebar">
@@ -512,7 +523,7 @@ async function toggleRegions(btn) {
     } catch (e) {
       console.error('[regions] fetch error:', e);
     } finally {
-      btn.disabled = false; btn.textContent = 'אזורים';
+      btn.disabled = false; btn.textContent = btn.dataset.label || 'אזורים';
     }
     if (!regionsCache) return;
   }
@@ -529,22 +540,34 @@ async function toggleRegions(btn) {
 }
 
 const RegionsControl = L.Control.extend({
-  options: { position: 'topright' },
+  options: { position: 'topleft' },   // west side = sea, keeps the north-east data visible
   onAdd: function () {
-    const wrap = L.DomUtil.create('div', 'leaflet-bar');
-    const btn = L.DomUtil.create('button', 'regions-toggle', wrap);
-    btn.type = 'button';
-    btn.textContent = 'אזורים';
-    btn.title = 'הצג / הסתר גבולות אזורים זואוגאוגרפיים';
+    const wrap = L.DomUtil.create('div', 'map-mode-ctl');
+    const mk = (parent, label, title) => {
+      const b = L.DomUtil.create('button', 'regions-toggle', parent);
+      b.type = 'button'; b.textContent = label; b.dataset.label = label; b.title = title;
+      return b;
+    };
+    const modes = L.DomUtil.create('div', 'leaflet-bar mode-bar', wrap);
+    const ui = {};
+    ui.bGrid = mk(modes, 'מפת חום', 'צפיפות תצפיות בריבועים');
+    ui.bReg  = mk(modes, 'אזורים', 'נתונים מצרפיים לפי אזור זואוגאוגרפי');
+    ui.bGrid.classList.add('active');
+    ui.outl = L.DomUtil.create('div', 'leaflet-bar', wrap);
+    ui.bOut = mk(ui.outl, 'גבולות אזורים', 'הצג / הסתר גבולות אזורים זואוגאוגרפיים');
     L.DomEvent.disableClickPropagation(wrap);
-    L.DomEvent.on(btn, 'click', () => toggleRegions(btn));
+    L.DomEvent.on(ui.bOut,  'click', () => toggleRegions(ui.bOut));
+    L.DomEvent.on(ui.bGrid, 'click', () => setMapMode('grid', ui));
+    L.DomEvent.on(ui.bReg,  'click', () => setMapMode('regions', ui));
     return wrap;
   }
 });
 new RegionsControl().addTo(map);
 
 function drawHeatmap(data) {
+  lastHeatData = data;
   clearHeat();
+  if (mapMode !== 'grid') return;   // regions mode: keep data, draw nothing
   if (!data || !data.length) return;
 
   const CELL = 0.09;
@@ -576,6 +599,188 @@ function drawHeatmap(data) {
 }
 
 
+// ── REGIONS MODE (test) ──────────────────────────────────────
+// Aggregated counts per zoogeographic region from public_region_counts.
+// No sighting locations are used or exposed — only region totals.
+let mapMode = 'grid';
+let lastHeatData = null;
+let outlinesWereOn = false;
+let regionFillLayer = null, regionLegend = null;
+let regionCounts = null, regionSpecies = null, regionExpected = null;
+
+map.createPane('regionFillPane');
+map.getPane('regionFillPane').style.zIndex = 360;   // above outlines, below heat/distribution
+
+// Same 5 bands as the richness map in the Facebook post
+const RICH_BINS = [[0,15,'#f4e6c8'],[16,22,'#e8c784'],[23,30,'#cf9a3c'],[31,35,'#a8711f'],[36,999,'#6f4512']];
+const richColor = s => (RICH_BINS.find(b => s >= b[0] && s <= b[1]) || RICH_BINS[0])[2];
+const MARINE_FAMILIES = new Set(['צבי-ים', 'צבים-גלדיים']);
+const LOW_COVERAGE = 0.8;
+const MAP_NOTE_GRID = document.getElementById('map-note').textContent;
+const MAP_NOTE_REGIONS = '🔒 המפה מציגה נתונים מצרפיים לפי אזור · מיקומים מדויקים אינם מוצגים לציבור';
+
+async function loadRegionData() {
+  if (!regionsCache) {
+    const res = await fetch('/israel-regions.geojson');
+    if (!res.ok) throw new Error('regions HTTP ' + res.status);
+    regionsCache = await res.json();
+  }
+  if (!regionCounts) {
+    regionCounts = await fetchAll(
+      sb.from('public_region_counts').select('region_id,species_id,report_count')
+        .order('region_id').order('species_id')
+    );
+  }
+  if (!regionExpected) {
+    // Expected species per region (static file from the regions analysis).
+    // Optional: if missing, the page simply omits the "expected" wording.
+    try {
+      const res = await fetch('/expected-by-region.json');
+      if (res.ok) {
+        const j = await res.json();
+        regionExpected = {};
+        Object.entries(j.regions || {}).forEach(([rid, list]) => { regionExpected[rid] = new Set(list); });
+      }
+    } catch (e) { console.warn('[regions mode] expected list not loaded:', e); }
+  }
+  if (!regionSpecies) {
+    const { data, error } = await sb.from('species').select('id,common_name,scientific_name,family');
+    if (error) throw error;
+    regionSpecies = {};
+    (data || []).forEach(s => { regionSpecies[s.id] = s; });
+  }
+}
+
+// Species richness per region — same rules as the Facebook analysis:
+// one taxon per scientific name; unidentified and sea turtles excluded;
+// introduced species included; a genus-only record counts only when no
+// species of that genus was recorded in the region.
+function regionStats() {
+  const acc = {};
+  regionCounts.forEach(r => {
+    const s = regionSpecies[r.species_id];
+    if (!s || s.common_name === 'לא מזוהה' || MARINE_FAMILIES.has(s.family)) return;
+    const a = acc[r.region_id] || (acc[r.region_id] = { taxa: {}, genus: {} });
+    const sci = (s.scientific_name || '').trim();
+    if (sci.split(/\s+/).length < 2) a.genus[sci] = (a.genus[sci] || 0) + r.report_count;
+    else a.taxa[sci] = (a.taxa[sci] || 0) + r.report_count;
+  });
+  const out = {};
+  Object.entries(acc).forEach(([rid, a]) => {
+    Object.entries(a.genus).forEach(([g, n]) => {
+      if (!Object.keys(a.taxa).some(t => t.split(/\s+/)[0] === g)) a.taxa['GENUS:' + g] = n;
+    });
+    const counts = Object.values(a.taxa);
+    const N = counts.reduce((x, y) => x + y, 0);
+    const f1 = counts.filter(c => c === 1).length;
+    out[rid] = { S: counts.length, N, low: N > 0 && (1 - f1 / N) < LOW_COVERAGE };
+  });
+  return out;
+}
+
+const fmtN = n => n === 1 ? 'תצפית אחת' : `${n.toLocaleString('he-IL')} תצפיות`;
+
+function renderRegions() {
+  if (regionFillLayer) { map.removeLayer(regionFillLayer); regionFillLayer = null; }
+  if (regionLegend)    { map.removeControl(regionLegend); regionLegend = null; }
+  if (mapMode !== 'regions' || !regionCounts || !regionsCache) return;
+
+  const sel = document.getElementById('species-select');
+  const name = sel.value;
+  const selSci = name ? (sel.options[sel.selectedIndex].dataset.sci || '').trim().split(/\s+/).slice(0, 2).join(' ') : '';
+  let presence = null;
+  if (name) {
+    const ids = new Set((nameToIds[name] || []).map(String));
+    presence = {};
+    regionCounts.forEach(r => {
+      if (ids.has(String(r.species_id))) presence[r.region_id] = (presence[r.region_id] || 0) + r.report_count;
+    });
+  }
+  const stats = presence ? null : regionStats();
+
+  regionFillLayer = L.geoJSON(regionsCache, {
+    pane: 'regionFillPane',
+    attribution: 'אזורים: מותאם מ-Fauna Palaestina',
+    style: f => {
+      const id = String(f.properties.id);
+      if (presence) {
+        return presence[id]
+          ? { color: '#6f4512', weight: 1.2, opacity: 0.9, fillColor: '#a8711f', fillOpacity: 0.55 }
+          : { color: '#8a7a66', weight: 1, opacity: 0.8, dashArray: '3 3', fill: true, fillOpacity: 0 };
+      }
+      const s = stats[id] || { S: 0, low: true };
+      return s.low
+        ? { color: '#5a4a3a', weight: 1.4, opacity: 0.9, dashArray: '4 3', fillColor: richColor(s.S), fillOpacity: 0.75 }
+        : { color: '#ffffff', weight: 1.2, opacity: 1, fillColor: richColor(s.S), fillOpacity: 0.8 };
+    },
+    onEachFeature: (f, layer) => {
+      const id = String(f.properties.id), rn = f.properties.name_he;
+      let html;
+      if (presence) {
+        const n = presence[id] || 0;
+        const expected = regionExpected && regionExpected[id] && regionExpected[id].has(selSci);
+        html = n ? `<b>${rn}</b><br>${name}: ${fmtN(n)}`
+           : expected ? `<b>${rn}</b><br>המין ${name} צפוי באזור זה לפי מפות התפוצה, אך טרם תועד`
+                      : `<b>${rn}</b><br>המין ${name} לא תועד באזור זה`;
+      } else {
+        const s = stats[id] || { S: 0, N: 0, low: true };
+        const E = regionExpected && regionExpected[id] ? regionExpected[id].size : null;
+        html = `<b>${rn}</b><br>${s.S} מינים${E ? ` מתוך ${E} צפויים` : ''} · ${fmtN(s.N)} מאומתות` +
+               (s.low ? `<br><span style="color:#8a7a66">מעט תצפיות — התמונה חלקית</span>` : '');
+      }
+      layer.bindPopup(html);
+    }
+  }).addTo(map);
+
+  regionLegend = L.control({ position: 'bottomleft' });
+  regionLegend.onAdd = () => {
+    const d = L.DomUtil.create('div', 'region-legend');
+    if (presence) {
+      // Brown region fill and the green range overlay mix to olive where they overlap
+      d.innerHTML = `<div class="t">${name}</div>` + (distributionLayer
+        ? `<div class="r"><span class="sw" style="background:#aeaf79;border:1px solid #6f4512"></span>תועד בתחום התפוצה</div>` +
+          `<div class="r"><span class="sw" style="background:rgba(168,113,31,0.55);border:1px solid #6f4512"></span>תועד מחוץ לתחום התפוצה</div>` +
+          `<div class="r"><span class="sw" style="background:rgba(74,170,90,0.35);border:1px solid #2a6a3a"></span>תחום תפוצה</div>`
+        : `<div class="r"><span class="sw" style="background:rgba(168,113,31,0.55);border:1px solid #6f4512"></span>תועד באזור</div>`) +
+        `<div class="r"><span class="sw" style="border:1px dashed #8a7a66"></span>לא תועד</div>`;
+    } else {
+      d.innerHTML = `<div class="t">מספר מינים שתועדו</div>` +
+        RICH_BINS.slice().reverse().map(([lo, hi, c]) =>
+          `<div class="r"><span class="sw" style="background:${c}"></span>${hi > 900 ? lo + ' ומעלה' : (lo === 0 ? 'עד ' + hi : lo + '–' + hi)}</div>`).join('') +
+        `<div class="r"><span class="sw" style="border:1.5px dashed #5a4a3a"></span>מעט תצפיות</div>` +
+        `<div class="n">לחצו על אזור לפרטים</div>`;
+    }
+    L.DomEvent.disableClickPropagation(d);
+    return d;
+  };
+  regionLegend.addTo(map);
+}
+
+async function setMapMode(mode, ui) {
+  if (mode === mapMode) return;
+  if (mode === 'regions') {
+    ui.bReg.disabled = true; ui.bReg.textContent = 'טוען...';
+    try { await loadRegionData(); }
+    catch (e) { console.error('[regions mode] load error:', e); }
+    finally { ui.bReg.disabled = false; ui.bReg.textContent = 'אזורים'; }
+    if (!regionCounts || !regionsCache || !regionSpecies) return;
+  }
+  mapMode = mode;
+  ui.bGrid.classList.toggle('active', mode === 'grid');
+  ui.bReg.classList.toggle('active', mode === 'regions');
+  ui.outl.style.display = mode === 'grid' ? '' : 'none';
+  if (mode === 'regions') {
+    if (regionsLayer) { toggleRegions(ui.bOut); outlinesWereOn = true; }
+    clearHeat();
+    renderRegions();
+  } else {
+    renderRegions();                         // removes the region fill + legend
+    if (lastHeatData) drawHeatmap(lastHeatData);
+    if (outlinesWereOn) { outlinesWereOn = false; toggleRegions(ui.bOut); }
+  }
+  document.getElementById('map-note').textContent = mode === 'grid' ? MAP_NOTE_GRID : MAP_NOTE_REGIONS;
+}
+
 // ── UTILS ────────────────────────────────────────────────────
 function animCount(id, target) {
   const el = document.getElementById(id);
@@ -597,13 +802,24 @@ function formatDate(d) {
 async function loadInfoBoxes() {
   const {count: total} = await sb.from('public_reports_safe').select('*', {count:'exact', head:true});
   const {count: valid} = await sb.from('public_reports_safe').select('*', {count:'exact', head:true});
-  // Distinct species actually reported (from validated reports)
-  const {data: repSp} = await sb.from('public_reports_safe').select('species:species_id(common_name)');
-  const reportedSpecies = new Set((repSp||[]).map(r => r.species?.common_name).filter(Boolean));
+  // Species counted once per scientific name; unidentified and genus-only
+  // entries are not counted. Sea turtles are included (Israeli species).
+  const spKey = s => {
+    if (!s || s.common_name === 'לא מזוהה') return null;
+    const sci = (s.scientific_name || '').trim();
+    return sci.split(/\s+/).length >= 2 ? sci : null;
+  };
 
-  // Total known species in Israel (distinct common names in species table)
-  const {data: allSp} = await sb.from('species').select('common_name');
-  const totalSpecies = new Set((allSp||[]).map(s => s.common_name).filter(Boolean));
+  // Distinct species actually reported — all validated reports, page by page
+  // (a single request returns at most 1000 rows)
+  const repSp = await fetchAll(
+    sb.from('public_reports_safe').select('species:species_id(common_name,scientific_name,family)').order('id')
+  );
+  const reportedSpecies = new Set(repSp.map(r => spKey(r.species)).filter(Boolean));
+
+  // Total known species in Israel, same rules
+  const {data: allSp} = await sb.from('species').select('common_name,scientific_name,family');
+  const totalSpecies = new Set((allSp||[]).map(spKey).filter(Boolean));
 
   animCount('ib-total', total || 0);
   animCount('ib-valid', total || 0);
@@ -676,7 +892,7 @@ async function onSpeciesChange() {
   const sel  = document.getElementById('species-select');
   const name = sel.value;
   const opt  = sel.options[sel.selectedIndex];
-  if (!name) { loadAllSpeciesHeatmap(); clearDistribution(); renderSpeciesCard(null, 0); return; }
+  if (!name) { loadAllSpeciesHeatmap(); clearDistribution(); renderSpeciesCard(null, 0); renderRegions(); return; }
 
   const ids = nameToIds[name] || [];
   const {data} = await sb.from('public_heatmap_grid')
@@ -699,6 +915,7 @@ async function onSpeciesChange() {
   drawHeatmap(mergedData);
   const totalCount = mergedData.reduce((s, r) => s + r.count, 0);
   renderSpeciesCard(opt.dataset, totalCount);
+  renderRegions();
 }
 
 // ── INITIAL FULL HEATMAP ──────────────────────────────────────
