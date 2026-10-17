@@ -375,6 +375,15 @@
             background: #5568d3;
         }
         
+        .date-choice-btn.secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        
+        .date-choice-btn.secondary:hover {
+            background: #cfcfcf;
+        }
+        
         /* TEST PAGE ONLY: banner */
         .test-banner {
             background: #fff3cd;
@@ -648,25 +657,41 @@
             return `${y}-${String(d).padStart(2, '0')}-${String(m).padStart(2, '0')}`;
         }
         
-        // NEW: show the date dialog; resolves with the chosen date, or null if cancelled
-        function askDateChoice(candidates) {
+        // NEW: show the date dialog; resolves with the chosen date, or null if cancelled.
+        // futureDate is set when the typed date is in the future and only one reading is possible.
+        function askDateChoice(candidates, futureDate = null) {
             return new Promise((resolve) => {
                 const modal = document.getElementById('dateModal');
+                const title = document.getElementById('dateModalTitle');
                 const choices = document.getElementById('dateChoices');
                 const close = (result) => {
                     modal.classList.remove('active');
                     resolve(result);
                 };
-                
-                choices.innerHTML = '';
-                candidates.forEach((iso) => {
+                const addButton = (text, className, onClick) => {
                     const btn = document.createElement('button');
                     btn.type = 'button';
-                    btn.className = 'date-choice-btn';
-                    btn.textContent = formatHebrewDate(iso);
-                    btn.onclick = () => close(iso);
+                    btn.className = className;
+                    btn.textContent = text;
+                    btn.onclick = onClick;
                     choices.appendChild(btn);
-                });
+                };
+                
+                choices.innerHTML = '';
+                if (futureDate) {
+                    const only = candidates[0];
+                    title.textContent = `התאריך שהוזן (${formatHebrewDate(futureDate)}) הוא בעתיד. האם התכוונת ל-${formatHebrewDate(only)}?`;
+                    addButton(`כן, ${formatHebrewDate(only)}`, 'date-choice-btn', () => close(only));
+                    addButton('לא, אתקן את התאריך', 'date-choice-btn secondary', () => {
+                        close(null);
+                        document.getElementById('date').focus();
+                    });
+                } else {
+                    title.textContent = 'לאיזה תאריך התכוונת?';
+                    candidates.forEach((iso) => {
+                        addButton(formatHebrewDate(iso), 'date-choice-btn', () => close(iso));
+                    });
+                }
                 
                 document.getElementById('closeDateModal').onclick = () => close(null);
                 modal.onclick = (e) => { if (e.target === modal) close(null); };
@@ -693,7 +718,9 @@
                     const candidates = [dateInput.value, swapped].filter((d) => d <= today);
                     // Ask if both readings are possible, or if only the swapped one is
                     if (candidates.length === 2 || (candidates.length === 1 && candidates[0] === swapped)) {
-                        const picked = await askDateChoice(candidates);
+                        const picked = candidates.length === 2
+                            ? await askDateChoice(candidates)
+                            : await askDateChoice(candidates, dateInput.value); // typed date is in the future
                         if (!picked) return false; // cancelled
                         dateInput.value = picked;
                         dateTyped = false; // resolved — don't ask again on retry
@@ -1007,7 +1034,7 @@
     <div id="dateModal" class="map-modal">
         <div class="map-modal-content date-modal-content">
             <div class="map-modal-header">
-                <h3>לאיזה תאריך התכוונת?</h3>
+                <h3 id="dateModalTitle">לאיזה תאריך התכוונת?</h3>
                 <button type="button" class="map-close-btn" id="closeDateModal">&times;</button>
             </div>
             <div id="dateChoices" class="date-choices"></div>
