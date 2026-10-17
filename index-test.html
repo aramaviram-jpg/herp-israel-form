@@ -404,7 +404,7 @@
         
         <div id="errorMessage" class="error-message" style="display:none;"></div>
         
-        <form id="reportForm">
+        <form id="reportForm" novalidate>
             <!-- Full Name -->
             <div class="form-group">
                 <label for="fullName">
@@ -570,6 +570,7 @@
         let selectedMarker = null;
         let selectedCoordinates = null;
         let dateTyped = false; // NEW: true once the user types into the date field
+        const MIN_DATE = '1900-01-01'; // NEW: earliest allowed sighting date
         
         // Load species on page load
         document.addEventListener('DOMContentLoaded', async () => {
@@ -618,7 +619,11 @@
         
         // Set default date to today (CHANGED: local date instead of UTC)
         function setDefaultDate() {
-            document.getElementById('date').value = localTodayISO();
+            const dateInput = document.getElementById('date');
+            const today = localTodayISO();
+            dateInput.value = today;
+            dateInput.max = today;     // calendar greys out future days
+            dateInput.min = MIN_DATE;
             dateTyped = false;
         }
         
@@ -674,6 +679,13 @@
         async function validateDate() {
             const dateInput = document.getElementById('date');
             const today = localTodayISO();
+            dateInput.max = today; // refresh in case the page was open past midnight
+            
+            // Empty, or not a plain yyyy-mm-dd with a 4-digit year (blocks 52026 etc.)
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateInput.value) || dateInput.value < MIN_DATE) {
+                showError('תאריך לא תקין');
+                return false;
+            }
             
             if (dateTyped) {
                 const swapped = getSwappedDate(dateInput.value);
@@ -842,6 +854,8 @@
             
             // NEW: date checks run first — before the button is disabled and before any upload
             if (!(await validateDate())) return;
+            // Browser's normal required-field checks (disabled by novalidate so our dialog runs first)
+            if (!e.target.reportValidity()) return;
             
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
