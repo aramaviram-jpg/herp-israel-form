@@ -488,7 +488,7 @@ async function loadDistribution(scientificName) {
   if (!feature) return;
 
   distributionLayer = L.geoJSON(feature, {
-    style: { color: '#2a6a3a', weight: 1, fillColor: '#4aaa5a', fillOpacity: 0.25 },
+    style: { color: '#2a6a3a', weight: 1, fillColor: '#4aaa5a', fillOpacity: 0.25 },  // = RANGE_FILL
     interactive: false   // no popup of its own; lets clicks reach the regions layer below
   }).addTo(map);
   distributionLayer.bringToBack();
@@ -680,7 +680,17 @@ function regionStats() {
 
 const fmtN = n => n === 1 ? 'תצפית אחת' : `${n.toLocaleString('he-IL')} תצפיות`;
 
+// The species range: filled in heatmap mode (as before); in regions mode a
+// green outline only, so each region shows one clear colour underneath.
+const RANGE_FILL    = { color: '#2a6a3a', weight: 1, opacity: 1, fillColor: '#4aaa5a', fillOpacity: 0.25 };
+const RANGE_OUTLINE = { color: '#1f7a3a', weight: 2.2, opacity: 0.95, fillOpacity: 0 };
+function styleDistribution() {
+  if (!distributionLayer) return;
+  distributionLayer.setStyle(mapMode === 'regions' ? RANGE_OUTLINE : RANGE_FILL);
+}
+
 function renderRegions() {
+  styleDistribution();
   if (regionFillLayer) { map.removeLayer(regionFillLayer); regionFillLayer = null; }
   if (regionLegend)    { map.removeControl(regionLegend); regionLegend = null; }
   if (mapMode !== 'regions' || !regionCounts || !regionsCache) return;
@@ -704,9 +714,11 @@ function renderRegions() {
     style: f => {
       const id = String(f.properties.id);
       if (presence) {
-        return presence[id]
-          ? { color: '#6f4512', weight: 1.2, opacity: 0.9, fillColor: '#a8711f', fillOpacity: 0.55 }
-          : { color: '#8a7a66', weight: 1, opacity: 0.8, dashArray: '3 3', fill: true, fillOpacity: 0 };
+        if (presence[id])
+          return { color: '#6f4512', weight: 1.2, opacity: 0.9, fillColor: '#a8711f', fillOpacity: 0.6 };
+        if (regionExpected && regionExpected[id] && regionExpected[id].has(selSci))
+          return { color: '#6f9a72', weight: 1, opacity: 0.9, fillColor: '#bfe0c2', fillOpacity: 0.7 };
+        return { color: '#8a7a66', weight: 1, opacity: 0.8, dashArray: '3 3', fill: true, fillOpacity: 0 };
       }
       const s = stats[id] || { S: 0, low: true };
       return s.low
@@ -719,7 +731,9 @@ function renderRegions() {
       if (presence) {
         const n = presence[id] || 0;
         const expected = regionExpected && regionExpected[id] && regionExpected[id].has(selSci);
-        html = n ? `<b>${rn}</b><br>${name}: ${fmtN(n)}`
+        const unexpected = n && regionExpected && !expected
+          ? `<br><span style="color:#8a7a66">תועד, אף שאינו צפוי באזור זה לפי מפות התפוצה</span>` : '';
+        html = n ? `<b>${rn}</b><br>${name}: ${fmtN(n)}${unexpected}`
            : expected ? `<b>${rn}</b><br>המין ${name} צפוי באזור זה לפי מפות התפוצה, אך טרם תועד`
                       : `<b>${rn}</b><br>המין ${name} לא תועד באזור זה`;
       } else {
@@ -736,13 +750,14 @@ function renderRegions() {
   regionLegend.onAdd = () => {
     const d = L.DomUtil.create('div', 'region-legend');
     if (presence) {
-      // Brown region fill and the green range overlay mix to olive where they overlap
-      d.innerHTML = `<div class="t">${name}</div>` + (distributionLayer
-        ? `<div class="r"><span class="sw" style="background:#aeaf79;border:1px solid #6f4512"></span>תועד בתחום התפוצה</div>` +
-          `<div class="r"><span class="sw" style="background:rgba(168,113,31,0.55);border:1px solid #6f4512"></span>תועד מחוץ לתחום התפוצה</div>` +
-          `<div class="r"><span class="sw" style="background:rgba(74,170,90,0.35);border:1px solid #2a6a3a"></span>תחום תפוצה</div>`
-        : `<div class="r"><span class="sw" style="background:rgba(168,113,31,0.55);border:1px solid #6f4512"></span>תועד באזור</div>`) +
-        `<div class="r"><span class="sw" style="border:1px dashed #8a7a66"></span>לא תועד</div>`;
+      // One fill per region (recorded / expected / neither); the range is a reference outline
+      d.innerHTML = `<div class="t">${name}</div>` +
+        `<div class="r"><span class="sw" style="background:rgba(168,113,31,0.6);border:1px solid #6f4512"></span>תועד באזור</div>` +
+        (regionExpected
+          ? `<div class="r"><span class="sw" style="background:#bfe0c2;border:1px solid #6f9a72"></span>צפוי באזור, טרם תועד</div>` +
+            `<div class="r"><span class="sw" style="border:1px dashed #8a7a66"></span>לא צפוי ולא תועד</div>`
+          : `<div class="r"><span class="sw" style="border:1px dashed #8a7a66"></span>לא תועד</div>`) +
+        (distributionLayer ? `<div class="r"><span class="sw" style="height:0;border-top:2.5px solid #1f7a3a;border-radius:0"></span>תחום התפוצה</div>` : '');
     } else {
       d.innerHTML = `<div class="t">מספר מינים שתועדו</div>` +
         RICH_BINS.slice().reverse().map(([lo, hi, c]) =>
