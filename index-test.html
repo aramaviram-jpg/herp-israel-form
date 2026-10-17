@@ -347,41 +347,12 @@
             cursor: not-allowed;
         }
         
-        /* NEW: Date choice dialog */
-        .date-modal-content {
-            width: 420px;
-        }
-        
-        .date-choices {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .date-choice-btn {
-            width: 100%;
-            padding: 14px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: inherit;
-        }
-        
-        .date-choice-btn:hover {
-            background: #5568d3;
-        }
-        
-        .date-choice-btn.secondary {
-            background: #e0e0e0;
+        /* NEW: chosen date in words, under the date field */
+        .date-readout {
+            font-size: 14px;
             color: #333;
-        }
-        
-        .date-choice-btn.secondary:hover {
-            background: #cfcfcf;
+            font-weight: 600;
+            margin-top: 6px;
         }
         
         /* TEST PAGE ONLY: banner */
@@ -413,7 +384,7 @@
         
         <div id="errorMessage" class="error-message" style="display:none;"></div>
         
-        <form id="reportForm" novalidate>
+        <form id="reportForm">
             <!-- Full Name -->
             <div class="form-group">
                 <label for="fullName">
@@ -429,6 +400,8 @@
                     תאריך התצפית <span class="required">*</span>
                 </label>
                 <input type="date" id="date" name="date" required>
+                <!-- NEW: chosen date in words -->
+                <p id="dateReadout" class="date-readout"></p>
             </div>
             
             <!-- Time -->
@@ -578,7 +551,7 @@
         let locationMap = null;
         let selectedMarker = null;
         let selectedCoordinates = null;
-        let dateTyped = false; // NEW: true once the user types into the date field
+        
         const MIN_DATE = '1900-01-01'; // NEW: earliest allowed sighting date
         
         // Load species on page load
@@ -626,115 +599,39 @@
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
         
-        // Set default date to today (CHANGED: local date instead of UTC)
+        // Set default date to today (CHANGED: local date, plus min/max)
         function setDefaultDate() {
             const dateInput = document.getElementById('date');
             const today = localTodayISO();
             dateInput.value = today;
             dateInput.max = today;     // calendar greys out future days
             dateInput.min = MIN_DATE;
-            dateTyped = false;
+            updateDateReadout();
         }
         
-        // NEW: detect keyboard entry in the date field (picker selection fires no key events)
-        document.getElementById('date').addEventListener('keydown', (e) => {
-            if (/^[0-9]$/.test(e.key) || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                dateTyped = true;
+        // NEW: show the chosen date in words, e.g. "נבחר: 17 באוקטובר 2026"
+        function updateDateReadout() {
+            const value = document.getElementById('date').value;
+            const readout = document.getElementById('dateReadout');
+            if (!value) {
+                readout.textContent = '';
+                return;
             }
+            const [y, m, d] = value.split('-').map(Number);
+            readout.textContent = 'נבחר: ' + new Intl.DateTimeFormat('he-IL', {
+                day: 'numeric', month: 'long', year: 'numeric'
+            }).format(new Date(y, m - 1, d));
+        }
+        
+        // NEW: date field — calendar only, no typing
+        const dateField = document.getElementById('date');
+        dateField.addEventListener('change', updateDateReadout);
+        dateField.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab') e.preventDefault(); // allow moving between fields only
         });
-        
-        // NEW: yyyy-mm-dd -> "5 באוקטובר 2026"
-        function formatHebrewDate(iso) {
-            const [y, m, d] = iso.split('-').map(Number);
-            return new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long', year: 'numeric' })
-                .format(new Date(y, m - 1, d));
-        }
-        
-        // NEW: returns the day/month-swapped date, or null if the date is not ambiguous
-        function getSwappedDate(iso) {
-            const [y, m, d] = iso.split('-').map(Number);
-            if (d > 12 || m > 12 || d === m) return null;
-            return `${y}-${String(d).padStart(2, '0')}-${String(m).padStart(2, '0')}`;
-        }
-        
-        // NEW: show the date dialog; resolves with the chosen date, or null if cancelled.
-        // futureDate is set when the typed date is in the future and only one reading is possible.
-        function askDateChoice(candidates, futureDate = null) {
-            return new Promise((resolve) => {
-                const modal = document.getElementById('dateModal');
-                const title = document.getElementById('dateModalTitle');
-                const choices = document.getElementById('dateChoices');
-                const close = (result) => {
-                    modal.classList.remove('active');
-                    resolve(result);
-                };
-                const addButton = (text, className, onClick) => {
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = className;
-                    btn.textContent = text;
-                    btn.onclick = onClick;
-                    choices.appendChild(btn);
-                };
-                
-                choices.innerHTML = '';
-                if (futureDate) {
-                    const only = candidates[0];
-                    title.textContent = `התאריך שהוזן (${formatHebrewDate(futureDate)}) הוא בעתיד. האם התכוונת ל-${formatHebrewDate(only)}?`;
-                    addButton(`כן, ${formatHebrewDate(only)}`, 'date-choice-btn', () => close(only));
-                    addButton('לא, אתקן את התאריך', 'date-choice-btn secondary', () => {
-                        close(null);
-                        document.getElementById('date').focus();
-                    });
-                } else {
-                    title.textContent = 'לאיזה תאריך התכוונת?';
-                    candidates.forEach((iso) => {
-                        addButton(formatHebrewDate(iso), 'date-choice-btn', () => close(iso));
-                    });
-                }
-                
-                document.getElementById('closeDateModal').onclick = () => close(null);
-                modal.onclick = (e) => { if (e.target === modal) close(null); };
-                modal.classList.add('active');
-            });
-        }
-        
-        // NEW: validate the date before anything is uploaded or saved.
-        // Returns true if submission may continue.
-        async function validateDate() {
-            const dateInput = document.getElementById('date');
-            const today = localTodayISO();
-            dateInput.max = today; // refresh in case the page was open past midnight
-            
-            // Empty, or not a plain yyyy-mm-dd with a 4-digit year (blocks 52026 etc.)
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateInput.value) || dateInput.value < MIN_DATE) {
-                showError('תאריך לא תקין');
-                return false;
-            }
-            
-            if (dateTyped) {
-                const swapped = getSwappedDate(dateInput.value);
-                if (swapped) {
-                    const candidates = [dateInput.value, swapped].filter((d) => d <= today);
-                    // Ask if both readings are possible, or if only the swapped one is
-                    if (candidates.length === 2 || (candidates.length === 1 && candidates[0] === swapped)) {
-                        const picked = candidates.length === 2
-                            ? await askDateChoice(candidates)
-                            : await askDateChoice(candidates, dateInput.value); // typed date is in the future
-                        if (!picked) return false; // cancelled
-                        dateInput.value = picked;
-                        dateTyped = false; // resolved — don't ask again on retry
-                    }
-                }
-            }
-            
-            if (dateInput.value > today) {
-                showError('לא ניתן לבחור תאריך עתידי');
-                return false;
-            }
-            
-            return true;
-        }
+        dateField.addEventListener('click', () => {
+            try { dateField.showPicker(); } catch (err) { /* older browser: native icon still works */ }
+        });
         
         // Get automatic location
         document.getElementById('getLocationBtn').addEventListener('click', async () => {
@@ -879,11 +776,6 @@
         document.getElementById('reportForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            // NEW: date checks run first — before the button is disabled and before any upload
-            if (!(await validateDate())) return;
-            // Browser's normal required-field checks (disabled by novalidate so our dialog runs first)
-            if (!e.target.reportValidity()) return;
-            
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="loading"></span> שולח דיווח...';
@@ -1027,17 +919,6 @@
             <button class="map-confirm-btn" id="confirmLocation" disabled>
                 אשר מיקום
             </button>
-        </div>
-    </div>
-    
-    <!-- NEW: Date Choice Modal -->
-    <div id="dateModal" class="map-modal">
-        <div class="map-modal-content date-modal-content">
-            <div class="map-modal-header">
-                <h3 id="dateModalTitle">לאיזה תאריך התכוונת?</h3>
-                <button type="button" class="map-close-btn" id="closeDateModal">&times;</button>
-            </div>
-            <div id="dateChoices" class="date-choices"></div>
         </div>
     </div>
 </body>
