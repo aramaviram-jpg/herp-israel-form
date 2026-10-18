@@ -1,7 +1,7 @@
 # Herp Israel Project - Quick Reference
 
 **Wildlife Reporting System for Israeli Reptiles & Amphibians**
-Last Updated: April 2026
+Last Updated: October 2026
 
 ---
 
@@ -102,11 +102,17 @@ Last Updated: April 2026
 
 ### Info Boxes (top)
 - Total sightings, validated sightings, distinct species, last-7-days species
+- **Species count** = one per scientific name, all validated reports; unidentified and genus-only entries not counted, sea turtles counted (e.g. "101 · מתוך 103 מינים בישראל")
 
-### Map
-- Species dropdown → filters heatmap to that species
-- Distribution polygon (from IUCN data via `herp.geojson`) appears below heatmap
-- Clear selection to return to full-dataset heatmap
+### Map — two modes (switch at top left: **מפת חום | אזורים**)
+- **מפת חום (heatmap, default):** grid cells of about 10 × 8.5 km (~85 km²) coloured by number of sightings
+  - **גבולות אזורים** toggle shows the 23 zoogeographic region outlines
+- **אזורים (regions):** aggregated counts per region — no locations shown
+  - No species selected: regions coloured by number of species recorded; popup shows "X מינים מתוך Y צפויים · N תצפיות"; dashed outline = few reports
+  - Species selected: each region gets one colour — **brown** recorded · **light green** expected but not yet recorded · **dashed** neither; the species range is a **green outline**
+- Species dropdown → filters the map to that species and shows its range (`herp.geojson`)
+- Clear selection to return to all species
+- The 4 hidden reports (see Hide a Report) are excluded everywhere on this page
 
 ### Species Card
 Shows: photo, Hebrew + scientific name, venom/poison badge (with SVG icons), activity time, size, diet, description, IUCN status, sighting count
@@ -115,6 +121,18 @@ Shows: photo, Hebrew + scientific name, venom/poison badge (with SVG icons), act
 - Monthly seasonality bar chart
 - Top 10 reported species
 - Family breakdown
+
+---
+
+## 📝 Submission Form — Date Field
+
+- **Default:** today, in Israel local time
+- **Calendar only:** typing is blocked; click anywhere in the field to open the calendar
+- **Limits:** 1 Jan 1900 to today — future days are greyed out
+- **Date in words** under the field: "נבחר: 17 באוקטובר 2026"
+- The day/month order *inside* the field follows the user's browser language (e.g. `mm/dd/yyyy` in English (US)) and can't be changed by the page — the stored date is correct either way
+
+**Form go-live cutoff** (for queries on form submissions only): `created_at >= '2026-02-23 07:58:00+02'`. Earlier rows are the legacy import, which is not corrected retroactively.
 
 ---
 
@@ -161,8 +179,33 @@ Shows: photo, Hebrew + scientific name, venom/poison badge (with SVG icons), act
 3. Paste URL into `photo_url` column
 
 ### Update Distribution Data (GeoJSON)
-1. Replace `herp.geojson` in GitHub repository
-2. Vercel auto-deploys; public page picks it up on next load
+1. Send the new `herp.geojson` to Claude to check and compact first — species names (`binomial`) must match `scientific_name` in the species table exactly, or the range won't show
+2. Claude recomputes range depths; experts decide new borderline cases; Claude regenerates `expected-by-region.json`
+3. Replace `herp.geojson` and `expected-by-region.json` in GitHub
+4. Vercel auto-deploys; public page picks them up on next load
+
+### Update Regions (israel-regions.geojson)
+1. Send the new file to Claude to validate and clean (overlaps, gaps, labels)
+2. Upload the cleaned file to GitHub **and** run the generated SQL update in Supabase (the database `regions` table must match the file)
+3. Run the region tests (`03_tests.sql`: tests 1–4 and 6)
+4. Regenerate and upload `expected-by-region.json`
+
+### Hide a Report from the Public
+For a validated report that should not appear publicly (e.g. an animal moved by people):
+```sql
+update public.reports set exclude_from_public = true where id = 12345;
+```
+- Disappears at once from public totals, charts, heatmap and regions; admins still see it
+- Undo: set it back to `false`
+- List hidden reports: `select id, date, species_id from reports where exclude_from_public;`
+
+### Test Form Changes (no staging)
+1. Deploy a copy as `index-test.html` with a test banner, `noindex`, and `[TEST …]` prefixed to name and comments
+2. Test on desktop (Hebrew + English US browser) and a phone — no photos
+3. Never validate test rows; delete them by ID + tag afterwards
+4. Apply the change to `index.html`, then delete `index-test.html`
+
+Full procedure: README_Comprehensive.md → Testing Form Changes
 
 ### Check Database Size
 1. Supabase → Settings → Usage
@@ -209,6 +252,8 @@ Photos are automatically archived weekly to Cloudflare R2.
 
 ---
 
+## ⚙️ Admin TEST_MODE Flag
+
 There is a flag near the top of `admin.html`:
 
 ```javascript
@@ -246,6 +291,8 @@ Generates visual cards for selected species. Each card shows the Hebrew and Lati
 
 **Card layout by species count:** 1 = centred, 2 = side by side, 3 = three columns, 4 = 2×2, 5 = 3+2, 6 = 3+3. For 4+ a note suggests screenshotting row by row.
 
+**Regions:** an "אזורים" switch shows the zoogeographic region outlines on the cards.
+
 ---
 
 ### Map Compare — `admin-map-compare.html`
@@ -264,6 +311,7 @@ Displays multiple species simultaneously on one shared map, each in a distinct c
 4. Toggle heatmap / distribution layers independently
 5. Click **נקה הכל** to clear all selections
 6. Click **🌙 מפה כהה / ☀️ מפה בהירה** to toggle basemap
+7. Use the **אזורים** / **שמות אזורים** switches to show region outlines and region names
 
 ---
 
@@ -271,6 +319,7 @@ Displays multiple species simultaneously on one shared map, each in a distinct c
 
 - **Colour palette** is shared between both tools via `localStorage` (`herp_species_colors`). Set a colour on one page and it persists on the other.
 - **Map mode** (light/dark) is also shared via `localStorage` (`herp_map_mode`).
+- **Region switches** are shared too (`herp_regions_on`, `herp_region_labels_on`); the outlines come from `regions-layer.js`.
 - Preference is applied on page load — switching on one tab does not live-update another already-open tab.
 
 ---
@@ -290,9 +339,19 @@ Displays multiple species simultaneously on one shared map, each in a distinct c
 - Refresh page (Ctrl+Shift+R)
 
 ### Distribution Polygon Not Showing
-- Species must have a two-word scientific name matching `herp.geojson`
+- Species must have a two-word scientific name matching `herp.geojson` exactly (spelling counts, e.g. `rueppellii`)
 - Check browser console for `[distribution]` logs (F12)
-- Not all species have IUCN polygons
+- Not all species have range polygons (introduced species have none)
+
+### Regions Mode Not Loading / Missing "Expected" Wording
+- Check `/israel-regions.geojson` and `/expected-by-region.json` open directly in the browser
+- Check browser console for `[regions mode]` logs (F12)
+- Without `expected-by-region.json` the page still works, but without "צפוי" wording or light-green regions
+
+### Date Field Issues
+- **Can't type a date:** by design — pick from the calendar
+- **Date shows in US order:** browser setting; the Hebrew text under the field shows the real date
+- **Today is greyed out:** page left open past midnight — reload
 
 ### Export Not Working
 - Check browser pop-up blocker
