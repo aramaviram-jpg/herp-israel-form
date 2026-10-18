@@ -345,6 +345,14 @@
             background: #ccc;
             cursor: not-allowed;
         }
+        
+        /* NEW: chosen date in words, under the date field */
+        .date-readout {
+            font-size: 14px;
+            color: #333;
+            font-weight: 600;
+            margin-top: 6px;
+        }
     </style>
 </head>
 <body>
@@ -374,6 +382,8 @@
                     תאריך התצפית <span class="required">*</span>
                 </label>
                 <input type="date" id="date" name="date" required>
+                <!-- NEW: chosen date in words -->
+                <p id="dateReadout" class="date-readout"></p>
             </div>
             
             <!-- Time -->
@@ -521,6 +531,8 @@
         let selectedMarker = null;
         let selectedCoordinates = null;
         
+        const MIN_DATE = '1900-01-01'; // NEW: earliest allowed sighting date
+        
         // Load species on page load
         document.addEventListener('DOMContentLoaded', async () => {
             await loadSpecies();
@@ -560,11 +572,45 @@
             }
         }
         
-        // Set default date to today
-        function setDefaultDate() {
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('date').value = today;
+        // NEW: today's date in local (Israel) time as yyyy-mm-dd — fixes UTC bug
+        function localTodayISO() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
+        
+        // Set default date to today (CHANGED: local date, plus min/max)
+        function setDefaultDate() {
+            const dateInput = document.getElementById('date');
+            const today = localTodayISO();
+            dateInput.value = today;
+            dateInput.max = today;     // calendar greys out future days
+            dateInput.min = MIN_DATE;
+            updateDateReadout();
+        }
+        
+        // NEW: show the chosen date in words, e.g. "נבחר: 17 באוקטובר 2026"
+        function updateDateReadout() {
+            const value = document.getElementById('date').value;
+            const readout = document.getElementById('dateReadout');
+            if (!value) {
+                readout.textContent = '';
+                return;
+            }
+            const [y, m, d] = value.split('-').map(Number);
+            readout.textContent = 'נבחר: ' + new Intl.DateTimeFormat('he-IL', {
+                day: 'numeric', month: 'long', year: 'numeric'
+            }).format(new Date(y, m - 1, d));
+        }
+        
+        // NEW: date field — calendar only, no typing
+        const dateField = document.getElementById('date');
+        dateField.addEventListener('change', updateDateReadout);
+        dateField.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab') e.preventDefault(); // allow moving between fields only
+        });
+        dateField.addEventListener('click', () => {
+            try { dateField.showPicker(); } catch (err) { /* older browser: native icon still works */ }
+        });
         
         // Get automatic location
         document.getElementById('getLocationBtn').addEventListener('click', async () => {
